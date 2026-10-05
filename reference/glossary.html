@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Course Glossary</title>
+<link rel="stylesheet" href="../assets/style.css">
+<style>dt { font-weight: 600; margin-top: 1.1rem; } dd { margin: .15rem 0 0 0; } .avoid { font-size: .82rem; color: var(--muted); }</style>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="course-map.html">Course map</a> · <a href="thread-basics.html">Thread basics</a> · <a href="../lessons/0001-start-and-join.html">Lesson 1</a></nav>
+
+<h1>Glossary</h1>
+<p class="subtitle">The words every lesson uses, with one meaning each.</p>
+<p>Terms are added as lessons cover them. Where the slides use several words for the same thing, this page picks one.</p>
+
+<h2>Threads</h2>
+<dl>
+<dt>Process</dt>
+<dd>A running program with its own private memory space. Contains one or more threads.</dd>
+
+<dt>Thread</dt>
+<dd>One path of execution inside a process. It has its own stack and shares the process's heap with the other threads.
+<div class="avoid">Avoid: “lightweight process”, “task” (task means something else once thread pools arrive)</div></dd>
+
+<dt>Main thread</dt>
+<dd>The thread the JVM creates to run <code>main()</code>. Every program has one.</dd>
+
+<dt>Start</dt>
+<dd>Calling <code>start()</code>, which creates a new thread that runs the object's <code>run()</code>. Calling <code>run()</code> directly does not start anything.</dd>
+
+<dt>Join</dt>
+<dd>Calling <code>t.join()</code>: the current thread waits until thread <code>t</code> terminates.
+<div class="avoid">Avoid: “wait for” as a technical term (<code>wait()</code> is a different method, coming in a later lecture)</div></dd>
+
+<dt>Asynchronous procedure</dt>
+<dd>A thread that computes a result and exposes it through a method like <code>getResult()</code>, to be read after a join (Deck 1 s75).</dd>
+
+<dt>Scheduler</dt>
+<dd>The part of the OS/JVM that decides which thread runs on which core, and for how long.</dd>
+
+<dt>Concurrent</dt>
+<dd>Two threads are concurrent if their executions <em>can</em> overlap, so either could run first (Deck 1 s9).</dd>
+
+<dt>Parallel</dt>
+<dd>Two threads are parallel if they are <em>actually</em> executing at the same instant, on different cores. Parallel implies concurrent, not the other way round.</dd>
+
+<dt>Non-deterministic</dt>
+<dd>The same program, with the same input, can produce different output on different runs, because the scheduler interleaves threads differently.</dd>
+</dl>
+</main>
+</body>
+</html>

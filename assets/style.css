@@ -1,0 +1,145 @@
+/* Shared stylesheet for every lesson and reference page. Tufte-ish: one
+   readable column, generous margins, sidenotes on wide screens. */
+
+:root {
+  --bg: #fffff8;
+  --fg: #1d1d1b;
+  --muted: #6b6b63;
+  --rule: #e4e2d6;
+  --accent: #a33b20;
+  --code-bg: #f4f2e8;
+  --good: #2f6b3a;
+  --good-bg: #e8f2e6;
+  --bad: #9a2a1d;
+  --bad-bg: #f8e6e2;
+  --note-bg: #f6f1df;
+  --measure: 40rem;
+  --tok-keyword: #8a2b8f; --tok-type: #1f5f8b; --tok-func: #7a4a00;
+  --tok-string: #2f6b3a; --tok-number: #a33b20; --tok-meta: #6b6b63;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b1b19; --fg: #e8e6dc; --muted: #9c9a8e; --rule: #3a3933;
+    --accent: #e08a6c; --code-bg: #26261f; --good: #8fcf98; --good-bg: #20311f;
+    --bad: #f0a092; --bad-bg: #3a221d; --note-bg: #2a2820;
+    --tok-keyword: #d79be0; --tok-type: #8cc2ea; --tok-func: #e6c07b;
+    --tok-string: #9ccf8f; --tok-number: #f0a48a; --tok-meta: #9c9a8e;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1b1b19; --fg: #e8e6dc; --muted: #9c9a8e; --rule: #3a3933;
+  --accent: #e08a6c; --code-bg: #26261f; --good: #8fcf98; --good-bg: #20311f;
+  --bad: #f0a092; --bad-bg: #3a221d; --note-bg: #2a2820;
+    --tok-keyword: #d79be0; --tok-type: #8cc2ea; --tok-func: #e6c07b;
+    --tok-string: #9ccf8f; --tok-number: #f0a48a; --tok-meta: #9c9a8e;
+}
+
+* { box-sizing: border-box; }
+html { font-size: 17px; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.6;
+}
+main { max-width: var(--measure); margin: 0 auto; padding: 3rem 16px 6rem; }
+
+nav.crumbs { font-size: .8rem; color: var(--muted); margin-bottom: 2.5rem; }
+nav.crumbs a { color: var(--muted); }
+
+h1 { font-weight: 600; font-size: 2.1rem; line-height: 1.2; margin: 0 0 .4rem; }
+.subtitle { color: var(--muted); font-size: 1.15rem; margin: 0 0 2rem; }
+h2 { font-weight: 600; font-size: 1.45rem; margin: 2.8rem 0 .6rem; }
+h3 { font-weight: 600; font-size: 1rem; margin: 1.8rem 0 .3rem; }
+p, li { hyphens: auto; }
+a { color: var(--accent); text-underline-offset: 2px; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 3rem 0; }
+
+code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .85rem; }
+:not(pre) > code { background: var(--code-bg); padding: .08em .3em; border-radius: 3px; }
+pre {
+  background: var(--code-bg); padding: .9rem 1rem; border-radius: 4px;
+  overflow-x: auto; line-height: 1.5; border-left: 3px solid var(--rule);
+}
+/* Syntax highlighting tokens (highlight.js, loaded by highlight.js asset) */
+pre.hljs { color: var(--fg); background: var(--code-bg); }
+.hljs-keyword, .hljs-meta .hljs-keyword { color: var(--tok-keyword); font-weight: 600; }
+.hljs-type, .hljs-built_in, .hljs-title.class_ { color: var(--tok-type); }
+.hljs-title.function_ { color: var(--tok-func); }
+.hljs-string { color: var(--tok-string); }
+.hljs-number, .hljs-literal { color: var(--tok-number); }
+.hljs-comment { color: var(--muted); }
+.hljs-meta { color: var(--tok-meta); }
+
+/* Sidenotes: inline small text on narrow screens, margin notes on wide ones. */
+.sidenote {
+  display: block; font-size: .78rem; line-height: 1.45; color: var(--muted);
+  border-left: 2px solid var(--rule); padding-left: .7rem; margin: .5rem 0 1rem;
+}
+@media (min-width: 1100px) {
+  main { margin-left: max(16px, calc(50vw - 28rem)); }
+  .sidenote {
+    float: right; clear: right; width: 15rem; margin-right: -17.5rem;
+    margin-top: .2rem; border: 0; padding: 0;
+  }
+}
+
+.slides { font-size: .78rem; color: var(--muted); }
+
+.callout { background: var(--note-bg); padding: .9rem 1.1rem; border-radius: 4px; margin: 1.5rem 0; }
+.callout > :first-child { margin-top: 0; }
+.callout > :last-child { margin-bottom: 0; }
+.callout.warn { border-left: 3px solid var(--accent); }
+
+.goal { border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: .8rem 0; margin: 0 0 2rem; }
+
+
+/* Numbered steps, e.g. a pattern to memorise */
+ol.steps { counter-reset: s; list-style: none; padding: 0; }
+ol.steps > li { counter-increment: s; padding-left: 2.2rem; position: relative; margin: .5rem 0; }
+ol.steps > li::before {
+  content: counter(s); position: absolute; left: 0; top: .05rem; width: 1.5rem; height: 1.5rem;
+  border-radius: 50%; border: 1px solid var(--accent); color: var(--accent);
+  font-size: .75rem; display: grid; place-items: center;
+}
+
+table { border-collapse: collapse; width: 100%; font-size: .88rem; margin: 1rem 0; }
+th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.table-wrap { overflow-x: auto; }
+
+/* Recall cards: <details class="recall"><summary>prompt</summary>answer</details> */
+details.recall { border: 1px solid var(--rule); border-radius: 4px; padding: .6rem .9rem; margin: .7rem 0; }
+details.recall summary { cursor: pointer; font-weight: 600; }
+details.recall[open] summary { margin-bottom: .5rem; }
+
+/* Quiz (driven by quiz.js) */
+.quiz { border: 1px solid var(--rule); border-radius: 6px; padding: 1rem 1.1rem; margin: 1.4rem 0; }
+.quiz .q { margin: 0 0 .7rem; }
+.quiz .q-num { color: var(--accent); font-weight: 600; margin-right: .3rem; }
+.quiz .options { display: grid; gap: .45rem; }
+.quiz button.opt {
+  font: inherit; font-size: .95rem; text-align: left; color: var(--fg); background: transparent;
+  border: 1px solid var(--rule); border-radius: 4px; padding: .5rem .75rem; cursor: pointer;
+}
+.quiz button.opt:hover:not(:disabled) { border-color: var(--accent); }
+.quiz button.opt:disabled { cursor: default; }
+.quiz button.opt.right { background: var(--good-bg); border-color: var(--good); }
+.quiz button.opt.wrong { background: var(--bad-bg); border-color: var(--bad); }
+.quiz .why { display: none; margin-top: .8rem; font-size: .9rem; }
+.quiz.done .why { display: block; }
+.quiz .why .verdict { font-weight: 600; }
+.quiz .why .verdict.right { color: var(--good); }
+.quiz .why .verdict.wrong { color: var(--bad); }
+.score { color: var(--muted); }
+
+.next { display: flex; justify-content: space-between; gap: 1rem; font-size: .9rem; margin-top: 3rem; }
+footer.ask { margin-top: 3rem; font-size: .9rem; color: var(--muted); }
+
+@media print {
+  :root { --bg: #fff; --fg: #000; }
+  main { max-width: none; padding: 0; margin: 0; }
+  nav.crumbs, .next, footer.ask, .quiz { display: none; }
+  .sidenote { float: none; width: auto; margin: .3rem 0; }
+  pre, table, details { break-inside: avoid; }
+  details.recall > *:not(summary) { display: block; }
+  a { color: inherit; }
+}

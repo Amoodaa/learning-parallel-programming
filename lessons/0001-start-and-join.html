@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Start and Join</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 1 of 7 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Start and Join</h1>
+<p class="subtitle">Give work to another thread, wait for it, and read the answer.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll write the two missing lines in a program that sums 10 million numbers on two threads, and see it print <code>PASS</code>. About 20 minutes.</p>
+
+<p>Almost every example in <em>ElementaryParallelism</em> follows this pattern, and so will the Java assignment and the exam's coding questions. Look at Deck 1, slide 17: <code>// wait for search to end</code>. That comment stands in for the line of code this lesson teaches.</p>
+
+<h2>1 · Process and thread</h2>
+<p class="slides">Deck 1 · slides 8, 12, 38–41</p>
+
+<p>A <strong>process</strong> is a running program with its own memory. A <strong>thread</strong> is one path of execution <em>inside</em> a process. Every Java program starts with one thread, the one running <code>main</code>, and you can add more.</p>
+<span class="sidenote">Oracle's tutorial: “Threads exist within a process — every process has at least one. Threads share the process's resources, including memory and open files.” <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/procthread.html">Processes and Threads</a></span>
+
+<p>For this course, one fact matters most (slide 41):</p>
+<ul>
+<li><strong>Shared:</strong> objects and their fields. If two threads hold a reference to the same array, they see the same array.</li>
+<li><strong>Private:</strong> local variables. If two threads run the same method, each gets its own copy of the locals.</li>
+</ul>
+
+<h2>2 · Creating a thread</h2>
+<p class="slides">Deck 1 · slides 42–48</p>
+
+<p>Put the work in a method called <code>run()</code>. There are two ways to do that:</p>
+
+<pre>// Way A: extend Thread
+class Worker extends Thread {
+    public void run() { /* the work */ }
+}
+Thread t = new Worker();
+
+// Way B: implement Runnable, then hand it to a Thread
+class Job implements Runnable {
+    public void run() { /* the work */ }
+}
+Thread t = new Thread(new Job());</pre>
+
+<p>Either way, nothing happens yet. You have only created a <code>Thread</code> <em>object</em>.</p>
+<span class="sidenote">Oracle recommends Runnable because your class can still extend something else, and because the thread pools in Deck 2 take Runnables. <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/runthread.html">Defining and Starting a Thread</a></span>
+
+<h2>3 · <code>start()</code>, not <code>run()</code></h2>
+
+<pre>t.start();  // new thread runs run(); returns at once
+t.run();    // NO new thread: main runs it, a normal call</pre>
+
+<p>This is the classic exam trap. <code>run()</code> is just a method. Only <code>start()</code> creates a new thread, and a thread can be started only once: a second <code>start()</code> throws <code>IllegalThreadStateException</code>.</p>
+<span class="sidenote">From the Javadoc: <code>run()</code> “is not intended to be invoked directly”, and <code>start()</code>: “A thread can be started at most once.” <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html">java.lang.Thread</a></span>
+
+<h2>4 · <code>join()</code>: wait for it</h2>
+<p class="slides">Deck 1 · slides 57–58, 75–79</p>
+
+<p>Once started, the new thread and <code>main</code> run <em>at the same time</em>. The scheduler decides who goes when, and you can't predict it (slide 41). So if <code>main</code> wants the result, it has to <strong>wait</strong>:</p>
+
+<pre>t.start();
+t.join();   // main pauses until t has finished
+System.out.println(t.getResult());  // now safe</pre>
+<span class="sidenote">“<code>t.join()</code> causes the current thread to pause execution until <code>t</code>'s thread terminates.” <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/join.html">Oracle: Joins</a>. <code>join()</code> can throw <code>InterruptedException</code>, which is why the slides wrap it in <code>try/catch</code>. Writing <code>throws InterruptedException</code> on <code>main</code> also works.</span>
+
+<p>Without the <code>join()</code>, <code>main</code> reads the result while the worker may still be running, and usually gets the default value <code>0</code>. Nothing crashes; you just get the wrong number.</p>
+
+<p>The slides call this pattern (a thread that computes something, then <code>join</code>, then <code>getResult()</code>) an <strong>asynchronous procedure</strong> (slides 75–79).</p>
+
+<h2>5 · The pattern</h2>
+<p class="slides">Deck 2 · slides 2–4</p>
+
+<p>Put it together and you have the backbone of Deck 2:</p>
+<ol class="steps">
+<li><strong>Split</strong>: give each worker its own range, e.g. <code>[0, mid)</code> and <code>[mid, n)</code>.</li>
+<li><strong>Start all</strong>: call <code>start()</code> on every worker <em>before</em> joining any of them.</li>
+<li><strong>Join all</strong>: wait for each one.</li>
+<li><strong>Combine</strong>: read each <code>getResult()</code> and merge them (add, OR, merge-sort…).</li>
+</ol>
+
+<div class="callout warn">
+<p>Order matters in steps 2–3. <code>a.start(); a.join(); b.start(); b.join();</code> is correct but <em>serial</em>: <code>b</code> doesn't begin until <code>a</code> has finished. Deck 2 slide 87 shows the same mistake with Fork/Join (“Never do this!”).</p>
+</div>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q"><code>Thread t = new MessagePrinter("hi", 3);</code> then <code>t.run();</code>. Which thread prints "hi"?</p>
+<div class="options">
+<button class="opt" data-correct>main, no new thread</button>
+<button class="opt">one new thread only</button>
+<button class="opt">main and new thread</button>
+<button class="opt">nothing gets printed</button>
+</div>
+<p class="why"><code>run()</code> is an ordinary method call, so <code>main</code> executes it. Only <code>start()</code> creates a new thread.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Take Deck 1 slide 58 and delete the <code>t.join()</code>. Where does “All messages are printed” appear?</p>
+<div class="options">
+<button class="opt">always printed last</button>
+<button class="opt">always printed first</button>
+<button class="opt" data-correct>could print anywhere</button>
+<button class="opt">never gets printed</button>
+</div>
+<p class="why">Without <code>join()</code>, the two threads run concurrently and the scheduler chooses the order. It's often first, because <code>main</code> is already running, but nothing guarantees that.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Which method calls, in which order, run two workers <em>in parallel</em> and then wait for both?</p>
+<div class="options">
+<button class="opt" data-correct>a.start; b.start; a.join; b.join</button>
+<button class="opt">a.start; a.join; b.start; b.join</button>
+<button class="opt">a.run; b.run; a.join; b.join</button>
+<button class="opt">a.join; b.join; a.start; b.start</button>
+</div>
+<p class="why">Start everything, then join everything. Joining <code>a</code> before starting <code>b</code> makes the program serial. <code>run()</code> creates no threads. Joining a thread that hasn't been started returns immediately, so the last option doesn't wait for any work.</p>
+</div>
+
+<div class="quiz">
+<p class="q">What happens when you call <code>t.start()</code> a second time on the same thread?</p>
+<div class="options">
+<button class="opt" data-correct>throws an exception</button>
+<button class="opt">runs the task twice</button>
+<button class="opt">restarts the thread</button>
+<button class="opt">second call ignored</button>
+</div>
+<p class="why"><code>IllegalThreadStateException</code>. A thread can be started at most once, even after it has finished.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Two threads both run the same <code>run()</code>, which declares a local <code>int k = 0;</code>. What happens to <code>k</code>?</p>
+<div class="options">
+<button class="opt" data-correct>each thread has its own k</button>
+<button class="opt">both threads share a single k</button>
+<button class="opt">only the first thread gets k</button>
+<button class="opt">Java makes k static for them</button>
+</div>
+<p class="why">Each thread has its own stack, so locals are private (Deck 1 slide 41). <em>Fields</em> of a shared object are what threads share.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0001/SumHalves.java"><code>lessons/code/0001/SumHalves.java</code></a>. It already contains a <code>Summer</code> thread class (the asynchronous-procedure shape from slide 76). Fill in the two <code>TODO</code> lines in <code>main</code>, then run:</p>
+<pre class="language-bash">cd lessons/code/0001
+java SumHalves.java</pre>
+<p>Run it unchanged first. It prints <code>total = 0</code> / <code>FAIL</code>, because nothing ever ran. Your goal is <code>PASS</code>.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>It's steps 2 and 3 of the pattern. Each TODO takes two method calls, one per worker.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Remove only the joins. What prints, and why? (b) Swap <code>start()</code> for <code>run()</code>. It still prints <code>PASS</code>. Why is that a bad sign rather than a good one?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>left.start(); right.start();
+left.join();  right.join();</pre>
+<p>(a) <code>total = 0</code>: <code>main</code> reads the results before the workers have written them. (b) <code>run()</code> makes <code>main</code> do both halves one after the other. The answer is correct but nothing ran in parallel, so the output alone can't tell you whether you used threads.</p>
+</details>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> Oracle's Java Tutorial, four short pages: <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/procthread.html">Processes and Threads</a> → <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/runthread.html">Defining and Starting a Thread</a> → <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/join.html">Joins</a> → <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/simple.html">The SimpleThreads Example</a>. About 10 minutes, and it covers the same ground as slides 38–58 with the explanations included.</p>
+<p>Then reread <strong>Deck 2, slides 2–7</strong>. They should now read as one story instead of a pile of code.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>What are the four steps of the pattern?</summary><p>Split → start all → join all → combine.</p></details>
+<details class="recall"><summary>What's the difference between <code>start()</code> and <code>run()</code>?</summary><p><code>start()</code> creates a new thread that executes <code>run()</code>. Calling <code>run()</code> directly is a normal method call on the current thread.</p></details>
+<details class="recall"><summary>What do two threads share, and what is private to each?</summary><p>Shared: objects and their fields (and statics). Private: local variables, because each thread has its own stack.</p></details>
+
+<div class="next"><a href="../reference/course-map.html">← Course map</a><span>Lesson 2: living threads (sleep, states, stopping) →</span></div>
+
+<footer class="ask">Anything unclear, a slide that still doesn't make sense, or a compile error you can't read? Ask your teacher (the agent) in the terminal. That's what it's for.</footer>
+</main>
+</body>
+</html>

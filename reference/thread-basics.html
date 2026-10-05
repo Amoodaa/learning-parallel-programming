@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thread Basics</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="course-map.html">Course map</a> · <a href="glossary.html">Glossary</a> · <a href="../lessons/0001-start-and-join.html">Lesson 1</a></nav>
+
+<h1>Thread Basics</h1>
+<p class="subtitle">A cheat sheet for creating, starting, and waiting on Java threads.</p>
+
+<h2>Create</h2>
+<pre>// A: subclass Thread
+class Worker extends Thread {
+    public void run() { ... }
+}
+Thread t = new Worker();
+
+// B: Runnable (preferred: works with pools later)
+class Job implements Runnable {
+    public void run() { ... }
+}
+Thread t = new Thread(new Job());</pre>
+
+<h2>Start, wait, read</h2>
+<div class="table-wrap"><table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>t.start()</code></td><td>Creates a new thread that runs <code>run()</code>. Returns immediately. Only once per thread, otherwise <code>IllegalThreadStateException</code>.</td></tr>
+<tr><td><code>t.run()</code></td><td>Normal method call on the <em>current</em> thread. No new thread.</td></tr>
+<tr><td><code>t.join()</code></td><td>Current thread waits until <code>t</code> terminates. Throws <code>InterruptedException</code>.</td></tr>
+<tr><td><code>t.join(ms)</code></td><td>Waits at most <code>ms</code> milliseconds.</td></tr>
+</table></div>
+
+<h2>The pattern</h2>
+<pre>Worker[] w = new Worker[k];
+for (int j = 0; j &lt; k; j++) {         // split + start all
+    w[j] = new Worker(/* range j */);
+    w[j].start();
+}
+for (Worker x : w) x.join();          // join all
+long total = 0;                       // combine
+for (Worker x : w) total += x.getResult();</pre>
+
+<h2>Asynchronous procedure (D1 s75–79)</h2>
+<pre>class FacN extends Thread {
+    private int n; private long result;
+    FacN(int n) { this.n = n; }
+    public void run() { /* compute */ result = ...; }
+    public long getResult() { return result; }   // read only after join()
+}</pre>
+
+<h2>Shared vs private</h2>
+<div class="table-wrap"><table>
+<tr><th>Shared between threads</th><th>Private to each thread</th></tr>
+<tr><td>Objects and their fields; arrays; <code>static</code> variables</td><td>Local variables and parameters (each thread has its own stack)</td></tr>
+</table></div>
+
+<p class="slides">Sources: Deck 1 slides 41–58, 75–79; <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html">java.lang.Thread Javadoc</a>; <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/">Oracle Concurrency tutorial</a>.</p>
+</main>
+</body>
+</html>
