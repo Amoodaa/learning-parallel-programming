@@ -8,7 +8,7 @@
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../lessons/0001-start-and-join.html">Lesson 1</a> · <a href="glossary.html">Glossary</a> · <a href="thread-basics.html">Thread basics</a></nav>
+<nav class="crumbs"><a href="../lessons/0001-start-and-join.html">Lesson 1</a> · <a href="glossary.html">Glossary</a> · <a href="thread-basics.html">Thread basics</a> · <a href="theory.html">Theory sheet</a></nav>
 
 <h1>Course Map</h1>
 <p class="subtitle">How the slides fit together, and what each group of slides is for.</p>
@@ -23,21 +23,21 @@
 <div class="table-wrap"><table>
 <tr><th>Slides</th><th>Topic</th><th>What it's really saying</th><th>Need</th><th>Lesson</th></tr>
 <tr><td>1–4</td><td>Admin</td><td>Reading list; course content (Java first, then C with OpenMP/MPI); 50% assignments (Java + C), 50% exam (theory + coding).</td><td>★</td><td>—</td></tr>
-<tr><td>5–7, 11, 16, 19–23</td><td>Why concurrency</td><td>Two reasons: <em>speed</em> (more cores, bigger problems) and <em>modelling</em> (a system with independent jobs, like two sensors polled at different rates, is easier to write with one thread per job). Robustness: one thread failing needn't kill the others.</td><td>★★</td><td>3</td></tr>
+<tr><td>5–7, 11, 16, 19–23</td><td>Why concurrency</td><td>Two reasons: <em>speed</em> (more cores, bigger problems) and <em>modelling</em> (a system with independent jobs, like two sensors polled at different rates, is easier to write with one thread per job). Robustness: one thread failing needn't kill the others.</td><td>★★</td><td><a href="../lessons/0003-theory-pack.html">3</a></td></tr>
 <tr><td>8–10, 12–13, 35–41</td><td>Vocabulary</td><td>Process vs thread; concurrent vs parallel; the scheduler decides who runs; CPU-bound vs I/O-bound; threads share the heap, each has its own stack.</td><td>★★★</td><td><a href="../lessons/0001-start-and-join.html">1</a></td></tr>
 <tr><td>14–15</td><td>Languages &amp; paradigms</td><td>Lots of languages have threads; Java mixes OO and functional styles.</td><td>★</td><td>—</td></tr>
 <tr><td>17–18</td><td>Parallel search teaser</td><td>A preview of Deck 2, slides 2–7. The code is broken (see errata). Notice the comment <code>// wait for search to end</code>: that is <code>join()</code>.</td><td>★★</td><td><a href="../lessons/0001-start-and-join.html">1</a></td></tr>
-<tr><td>24–31</td><td>What goes wrong</td><td>Non-determinism (the same program gives different output), critical sections and the 4 conditions for correct sharing, deadlock (Coffman's 4 conditions plus 4 ways to deal with it). <em>A preview: the details come in later lectures.</em></td><td>★★</td><td>3</td></tr>
-<tr><td>32–33</td><td>History</td><td>Dijkstra (semaphores, 1965), Hoare and Brinch Hansen (monitors, 1973).</td><td>★</td><td>3</td></tr>
+<tr><td>24–31</td><td>What goes wrong</td><td>Non-determinism (the same program gives different output), critical sections and the 4 conditions for correct sharing, deadlock (Coffman's 4 conditions plus 4 ways to deal with it). <em>A preview: the details come in later lectures.</em></td><td>★★</td><td><a href="../lessons/0003-theory-pack.html">3</a></td></tr>
+<tr><td>32–33</td><td>History</td><td>Dijkstra (semaphores, 1965), Hoare and Brinch Hansen (monitors, 1973).</td><td>★</td><td><a href="../lessons/0003-theory-pack.html">3</a></td></tr>
 <tr><td>42–48</td><td>Creating a thread</td><td>Two ways: <code>extends Thread</code> or <code>implements Runnable</code>. Both put the work in <code>run()</code>; <code>start()</code> launches it.</td><td>★★★</td><td><a href="../lessons/0001-start-and-join.html">1</a></td></tr>
-<tr><td>49–56</td><td>sleep()</td><td>Pause the <em>current</em> thread for some milliseconds. Two counters with different sleeps interleave their output.</td><td>★★★</td><td>2</td></tr>
+<tr><td>49–56</td><td>sleep()</td><td>Pause the <em>current</em> thread for some milliseconds. Two counters with different sleeps interleave their output.</td><td>★★★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
 <tr><td>57–58</td><td>join()</td><td>Wait for another thread to finish.</td><td>★★★</td><td><a href="../lessons/0001-start-and-join.html">1</a></td></tr>
-<tr><td>59–65</td><td>Names, ids, currentThread, yield</td><td>Small helper methods. The ids printed on slide 62 come out in a jumbled order because of non-determinism.</td><td>★★</td><td>2</td></tr>
-<tr><td>66–68</td><td>Thread states</td><td>NEW → RUNNABLE → (BLOCKED / WAITING / TIMED_WAITING) → TERMINATED.</td><td>★★</td><td>2</td></tr>
-<tr><td>69–71</td><td>Priority</td><td>1–10. It's only a hint, and the OS can ignore it.</td><td>★</td><td>2</td></tr>
-<tr><td>72–74</td><td>Stopping a thread</td><td>Let <code>run()</code> return. To stop a thread from outside, set a <code>volatile boolean</code> flag that it checks.</td><td>★★★</td><td>2</td></tr>
-<tr><td>75–83</td><td>Getting a result back</td><td>"Asynchronous procedure" = start a thread, join it, then read a field through a <code>getResult()</code> method (or a shared <code>Result</code> object).</td><td>★★★</td><td><a href="../lessons/0001-start-and-join.html">1</a>, 2</td></tr>
-<tr><td>84–89</td><td>Exercises</td><td>Practice on stopping threads. The ones without <code>volatile</code> are trick questions (lesson 2).</td><td>★★</td><td>2</td></tr>
+<tr><td>59–65</td><td>Names, ids, currentThread, yield</td><td>Small helper methods. The ids printed on slide 62 come out in a jumbled order because of non-determinism.</td><td>★★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
+<tr><td>66–68</td><td>Thread states</td><td>NEW → RUNNABLE → (BLOCKED / WAITING / TIMED_WAITING) → TERMINATED.</td><td>★★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
+<tr><td>69–71</td><td>Priority</td><td>1–10. It's only a hint, and the OS can ignore it.</td><td>★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
+<tr><td>72–74</td><td>Stopping a thread</td><td>Let <code>run()</code> return. To stop a thread from outside, set a <code>volatile boolean</code> flag that it checks.</td><td>★★★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
+<tr><td>75–83</td><td>Getting a result back</td><td>"Asynchronous procedure" = start a thread, join it, then read a field through a <code>getResult()</code> method (or a shared <code>Result</code> object).</td><td>★★★</td><td><a href="../lessons/0001-start-and-join.html">1</a>, <a href="../lessons/0002-living-threads.html">2</a></td></tr>
+<tr><td>84–89</td><td>Exercises</td><td>Practice on stopping threads. The ones without <code>volatile</code> are trick questions (lesson 2).</td><td>★★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
 <tr><td>90–95</td><td>CPU scheduler</td><td>A toy round-robin scheduler built from priorities. Hard to follow and buggy, so skip unless it's assigned.</td><td>★</td><td>—</td></tr>
 </table></div>
 
@@ -63,8 +63,8 @@
 <p>Built only from these two decks. When new slides arrive (synchronisation, locks, semaphores, then C/OpenMP/MPI), they get added here.</p>
 <ol>
 <li><a href="../lessons/0001-start-and-join.html">Start and join</a>: make a thread, wait for it, read its result.</li>
-<li>Living threads: sleep, states, stopping with a <code>volatile</code> flag.</li>
-<li>Theory pack: concurrent vs parallel, critical-section rules, deadlock conditions.</li>
+<li><a href="../lessons/0002-living-threads.html">Living threads</a>: sleep, states, stopping with a <code>volatile</code> flag.</li>
+<li><a href="../lessons/0003-theory-pack.html">Theory pack</a>: concurrent vs parallel, critical-section rules, deadlock conditions. <em>Lessons 1–3 complete Deck 1.</em></li>
 <li>Fair splitting: <code>j*N/k</code>, threads = cores.</li>
 <li>Thread pools, <code>Callable</code>, and <code>Future</code>.</li>
 <li>Uneven work: small tasks in a pool.</li>
@@ -80,7 +80,7 @@
 <tr><td>D1 s50, 67, 73</td><td><code>this.sleep(...)</code> looks like it sleeps "this" thread object.</td><td><code>sleep</code> is static and always pauses the <em>current</em> thread (<a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/sleep.html">Oracle</a>). Write <code>Thread.sleep(...)</code>.</td></tr>
 <tr><td>D1 s66</td><td><code>TIME_WAITING</code></td><td><code>TIMED_WAITING</code> (<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.State.html">Javadoc</a>)</td></tr>
 <tr><td>D1 s93</td><td><code>removeThread</code> never increments <code>j</code>, so it loops forever unless the match is at index 0.</td><td>Add <code>j++</code> in the else branch.</td></tr>
-<tr><td>D2 s7, D1 s86–88</td><td>A <code>boolean</code> flag shared between threads with no <code>volatile</code>: the other thread may never see the change.</td><td>Covered in lesson 2. D1 s73 does it right with <code>volatile</code>.</td></tr>
+<tr><td>D2 s7, D1 s86–88</td><td>A <code>boolean</code> flag shared between threads with no <code>volatile</code>: the other thread may never see the change.</td><td>Covered in <a href="../lessons/0002-living-threads.html">lesson 2</a>. D1 s73 does it right with <code>volatile</code>.</td></tr>
 <tr><td>D2 s26</td><td>Calls <code>new RankerNoDup(data, copy, from, to)</code>, but slide 18 only defines a 3-argument constructor.</td><td>The worker has to loop <code>i</code> over its own segment (the slides don't show this).</td></tr>
 <tr><td>D2 s39</td><td><code>base = MAX/numProc</code>, so the leftover <code>MAX % numProc</code> numbers are never checked.</td><td>This is why slide 22 introduces <code>j*N/k</code>.</td></tr>
 <tr><td>D2 s84</td><td><code>RecursiveAction&lt;V&gt;</code></td><td><code>RecursiveAction</code> takes no type parameter; <code>compute()</code> returns <code>void</code> (<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/RecursiveAction.html">Javadoc</a>).</td></tr>

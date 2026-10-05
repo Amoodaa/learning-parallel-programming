@@ -9,7 +9,7 @@
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="course-map.html">Course map</a> · <a href="glossary.html">Glossary</a> · <a href="../lessons/0001-start-and-join.html">Lesson 1</a></nav>
+<nav class="crumbs"><a href="course-map.html">Course map</a> · <a href="glossary.html">Glossary</a> · <a href="../lessons/0001-start-and-join.html">Lesson 1</a> · <a href="../lessons/0002-living-threads.html">Lesson 2</a></nav>
 
 <h1>Thread Basics</h1>
 <p class="subtitle">A cheat sheet for creating, starting, and waiting on Java threads.</p>
@@ -51,8 +51,34 @@ for (Worker x : w) total += x.getResult();</pre>
     private int n; private long result;
     FacN(int n) { this.n = n; }
     public void run() { /* compute */ result = ...; }
-    public long getResult() { return result; }   // read only after join()
+    // read only after join():
+    public long getResult() { return result; }
 }</pre>
+
+<h2>Sleep (D1 s50–56)</h2>
+<pre>try {
+    Thread.sleep(500);   // pauses the CURRENT thread
+} catch (InterruptedException e) {
+    return;              // interrupted: usually stop
+}</pre>
+
+<h2>Helpers (D1 s59–71)</h2>
+<div class="table-wrap"><table>
+<tr><th>Call</th><th>Effect</th></tr>
+<tr><td><code>setName</code> / <code>getName</code> / <code>getId</code></td><td>Label and identify a thread.</td></tr>
+<tr><td><code>Thread.currentThread()</code></td><td>The thread running this line.</td></tr>
+<tr><td><code>t.isAlive()</code></td><td>Started and not finished.</td></tr>
+<tr><td><code>Thread.yield()</code>, <code>setPriority(1..10)</code></td><td>Hints only; the scheduler may ignore them.</td></tr>
+</table></div>
+
+<h2>States (D1 s66–68)</h2>
+<p><code>NEW</code> → <code>RUNNABLE</code> → <code>BLOCKED</code> (lock) / <code>WAITING</code> (<code>join()</code>) / <code>TIMED_WAITING</code> (<code>sleep(ms)</code>, <code>join(ms)</code>) → <code>TERMINATED</code></p>
+
+<h2>Stop from outside (D1 s72–74)</h2>
+<pre>// volatile: other threads SEE the write
+private volatile boolean go = true;
+public void run() { while (go) { ... } }
+public void terminate() { go = false; }</pre>
 
 <h2>Shared vs private</h2>
 <div class="table-wrap"><table>
@@ -60,7 +86,7 @@ for (Worker x : w) total += x.getResult();</pre>
 <tr><td>Objects and their fields; arrays; <code>static</code> variables</td><td>Local variables and parameters (each thread has its own stack)</td></tr>
 </table></div>
 
-<p class="slides">Sources: Deck 1 slides 41–58, 75–79; <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html">java.lang.Thread Javadoc</a>; <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/">Oracle Concurrency tutorial</a>.</p>
+<p class="slides">Sources: Deck 1 slides 41–79; <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html">java.lang.Thread Javadoc</a>; <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/">Oracle Concurrency tutorial</a>.</p>
 </main>
 </body>
 </html>

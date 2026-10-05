@@ -46,8 +46,51 @@
 <dt>Parallel</dt>
 <dd>Two threads are parallel if they are <em>actually</em> executing at the same instant, on different cores. Parallel implies concurrent, not the other way round.</dd>
 
+<dt>Sleep</dt>
+<dd><code>Thread.sleep(ms)</code>: pauses the <em>current</em> thread for a time. Static, whatever object you call it on.</dd>
+
+<dt>Interrupt</dt>
+<dd>A signal from one thread asking another to stop what it's doing. A sleeping thread receives it as an <code>InterruptedException</code>.</dd>
+
+<dt>Thread state</dt>
+<dd>One of <code>NEW</code>, <code>RUNNABLE</code>, <code>BLOCKED</code>, <code>WAITING</code>, <code>TIMED_WAITING</code>, <code>TERMINATED</code>, returned by <code>getState()</code>.</dd>
+
+<dt>Stop flag</dt>
+<dd>A <code>volatile boolean</code> field that a thread's <code>run()</code> loop checks, and that another thread sets to end it cleanly.</dd>
+
+<dt>Volatile</dt>
+<dd>A field modifier guaranteeing that a write by one thread is visible to later reads by other threads. Gives visibility, not mutual exclusion.</dd>
+
 <dt>Non-deterministic</dt>
 <dd>The same program, with the same input, can produce different output on different runs, because the scheduler interleaves threads differently.</dd>
+</dl>
+
+<h2>Sharing &amp; deadlock</h2>
+<dl>
+<dt>Critical section</dt>
+<dd>Code that uses a shared resource and must not be run by more than one thread at a time.</dd>
+
+<dt>Mutual exclusion</dt>
+<dd>The guarantee that at most one thread is inside a given critical section.</dd>
+
+<dt>Race condition</dt>
+<dd>A bug where the result depends on how threads happen to interleave, e.g. two unsynchronised <code>count++</code>.
+<div class="avoid">Avoid: “sharing violation” (the slides' term for the same thing)</div></dd>
+
+<dt>Atomic</dt>
+<dd>Happens as one indivisible step that no other thread can see half-done. <code>count++</code> is <em>not</em> atomic.</dd>
+
+<dt>Deadlock</dt>
+<dd>A set of threads, each waiting for an event that only another thread in the set can cause.</dd>
+
+<dt>Coffman conditions</dt>
+<dd>Mutual exclusion, hold and wait, no pre-emption, circular wait. All four are needed for deadlock.</dd>
+
+<dt>Starvation</dt>
+<dd>One thread waits forever while the others keep making progress.</dd>
+
+<dt>CPU-bound / I/O-bound</dt>
+<dd>A thread that spends its time computing / waiting on disk, network or a user.</dd>
 </dl>
 </main>
 </body>

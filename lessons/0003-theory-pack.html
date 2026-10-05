@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Theory Pack</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 3 of 7 · <a href="../reference/theory.html">Theory sheet</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Theory Pack</h1>
+<p class="subtitle">The exam-theory slides from Lecture 1, in one place.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll write exam-style answers from memory on concurrency vs parallelism, critical sections and deadlock, and check them against model answers. About 20 minutes.</p>
+
+<p>Deck 1 scatters its theory: slides 5–33 jump from quotes to definitions to code to history. Sorted out, it's four ideas, each building on the last: <strong>what</strong> concurrency is, <strong>why</strong> we bother, what goes <strong>wrong</strong> when threads share things, and the worst case of that, <strong>deadlock</strong>.</p>
+
+<h2>1 · Concurrent vs parallel</h2>
+<p class="slides">Deck 1 · slides 8–10</p>
+
+<p>Slide 8 lists three ways to run several processes:</p>
+<ol>
+<li>All share <strong>one processor</strong>, taking turns.</li>
+<li>Each has its own processor, with <strong>shared memory</strong> (a multicore PC; Java threads).</li>
+<li>Each has its own processor, <strong>distributed</strong> across machines (the MPI half of the course).</li>
+</ol>
+<p>Then slide 9 gives the two definitions the exam is most likely to ask for:</p>
+<ul>
+<li><strong>Parallel</strong>: actually executing <em>at the same instant</em>. Only possible in forms 2 and 3.</li>
+<li><strong>Concurrent</strong>: having the <em>potential</em> to execute in parallel. Two threads on a single core are concurrent but not parallel, because they take turns.</li>
+</ul>
+<p>So parallel implies concurrent, but not the other way round. When there are more threads than cores, the <strong>scheduler</strong> decides who runs and for how long (slide 10). A thread is <strong>CPU-bound</strong> if it spends its time computing, and <strong>I/O-bound</strong> if it spends its time waiting on disk, network or a user. The difference matters in Deck 2: extra threads help CPU-bound work only up to the number of cores.</p>
+
+<h2>2 · Why bother</h2>
+<p class="slides">Deck 1 · slides 7, 11, 19–23</p>
+
+<div class="table-wrap"><table>
+<tr><th>Reason</th><th>Meaning</th><th>Slide</th></tr>
+<tr><td>Speed / scale</td><td>More CPU and memory, so larger problems get solved faster, or become solvable at all.</td><td>11</td></tr>
+<tr><td>Modelling</td><td>Independent jobs get one thread each: clients on a server, two sensors read every 20 ms and 35 ms.</td><td>19–21</td></tr>
+<tr><td>Aperiodic events</td><td>A thread sleeps until something happens (an alarm), then reacts immediately.</td><td>22</td></tr>
+<tr><td>Robustness</td><td>If one monitoring thread fails, the others can keep going.</td><td>23</td></tr>
+</table></div>
+
+<h2>3 · What goes wrong: sharing</h2>
+<p class="slides">Deck 1 · slides 24–27, 31</p>
+
+<p><strong>Non-determinism</strong> (slide 24): a single-threaded program gives the same output every run. A multithreaded one can give different output on each run, because the scheduler interleaves the threads differently every time. That's why testing is hard: one passing run proves little.</p>
+
+<p>It gets dangerous when threads <strong>share data</strong>. A <strong>critical section</strong> is a piece of code that uses a shared resource (slides 25–26: the screen) and must not be run by two threads at once. Slide 27 lists the four rules any correct solution must satisfy:</p>
+<ol class="steps">
+<li><strong>Mutual exclusion:</strong> no two inside their critical sections at the same time.</li>
+<li><strong>No speed assumptions:</strong> it must work whatever the speed or number of CPUs.</li>
+<li><strong>Outside can't block:</strong> a thread outside its critical section may not stop others entering.</li>
+<li><strong>No waiting forever:</strong> every thread eventually gets in.</li>
+</ol>
+<span class="sidenote">OSTEP: “A critical section is a piece of code that accesses a shared variable … and must not be concurrently executed by more than one thread.” A <em>race condition</em> is when “the results depend on the timing of the code's execution.” <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf">OSTEP ch. 26, Concurrency: An Introduction</a></span>
+
+<p>Slide 31's bullet “What is atomic and what is not?” refers to exactly this: <code>count++</code> looks like one step, but it's really three (read, add 1, write back). Two threads can both read the same old value and each write back the same +1, so one of the increments is lost. Run the demo to see it:</p>
+<pre class="language-bash">java lessons/code/0003/Race.java</pre>
+<p>Two threads each add 1 a million times. On my machine it printed about 1.1 million instead of 2 million, and a different number every run. <a href="code/0003/Race.java">Race.java</a> is a demonstration only; the fix (locks) is a later lecture.</p>
+
+<h2>4 · Deadlock</h2>
+<p class="slides">Deck 1 · slides 28–30</p>
+
+<p><strong>Deadlock</strong> (Tanenbaum, slide 28): a set of processes, each waiting for an event that only <em>another process in the set</em> can cause. Everyone is waiting, so nobody ever moves. For example, A holds the printer and wants the scanner, while B holds the scanner and wants the printer.</p>
+
+<p>Coffman: deadlock needs <strong>all four</strong> of these at once (slide 29):</p>
+<div class="table-wrap"><table>
+<tr><th>Condition</th><th>In plain words</th></tr>
+<tr><td>Mutual exclusion</td><td>Each resource is held by at most one process.</td></tr>
+<tr><td>Hold and wait</td><td>A process keeps what it has while asking for more.</td></tr>
+<tr><td>No pre-emption</td><td>You can't take a resource away; only the holder releases it.</td></tr>
+<tr><td>Circular wait</td><td>A cycle: A waits for B, B waits for … , which waits for A.</td></tr>
+</table></div>
+<span class="sidenote">OSTEP lists the same four and adds: “If any of these four conditions are not met, deadlock cannot occur.” Its most practical prevention technique is a fixed lock order, which breaks circular wait. <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf">OSTEP ch. 32, Common Concurrency Problems</a></span>
+
+<p>Four strategies for dealing with it (slide 30): <strong>ignore</strong> it; <strong>detect and recover</strong> (find the cycle, then kill or roll back a process); <strong>avoid</strong> it dynamically (only grant a resource if the system stays safe); <strong>prevent</strong> it (design so that one of the four conditions can never hold, e.g. always acquire resources in the same order).</p>
+
+<p><strong>Starvation</strong> appears in slide 28's title but is never defined. It means one thread waits forever while the others keep running, which breaks rule 4 from section 3. Under deadlock nobody runs; under starvation everyone else does.</p>
+
+<p>History (slides 32–33) is on the <a href="../reference/theory.html">theory sheet</a>.</p>
+
+<h2>Check yourself</h2>
+
+<div class="quiz">
+<p class="q">Two threads run on a machine with a single core. They are…</p>
+<div class="options">
+<button class="opt" data-correct>concurrent, not parallel</button>
+<button class="opt">parallel, not concurrent</button>
+<button class="opt">concurrent and parallel</button>
+<button class="opt">neither, purely serial</button>
+</div>
+<p class="why">They take turns, so they never run at the same instant (not parallel). They <em>could</em> run in parallel given more cores, which makes them concurrent.</p>
+</div>
+
+<div class="quiz">
+<p class="q">“Every thread must acquire lock L1 before lock L2.” Which Coffman condition does this rule break?</p>
+<div class="options">
+<button class="opt" data-correct>circular wait</button>
+<button class="opt">hold and wait</button>
+<button class="opt">no pre-emption</button>
+<button class="opt">mutual exclusion</button>
+</div>
+<p class="why">If everyone takes resources in the same order, no cycle can form. Threads can still hold one lock while waiting for the other, and the locks are still exclusive and can't be taken away.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Thread A has left its critical section, but it's still holding a flag that stops B from entering. Which rule from slide 27 is broken?</p>
+<div class="options">
+<button class="opt" data-correct>outside may not block others</button>
+<button class="opt">only one inside at a time</button>
+<button class="opt">no assumptions about speed</button>
+<button class="opt">nobody waits forever to enter</button>
+</div>
+<p class="why">Rule 3: a thread <em>outside</em> its critical section must not stop others from entering. Only one thread is involved here, so mutual exclusion is fine.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Race.java printed 1,112,159 instead of 2,000,000. Why?</p>
+<div class="options">
+<button class="opt" data-correct>count++ is not atomic</button>
+<button class="opt">the JVM skips some loops</button>
+<button class="opt">join returned too early</button>
+<button class="opt">the int overflowed max</button>
+</div>
+<p class="why"><code>count++</code> is read, add, write. When both threads read the same value and both write back value+1, one increment is lost. The joins are correct, and 2 million is far below <code>int</code>'s limit of about 2.1 billion.</p>
+</div>
+
+<div class="quiz">
+<p class="q">The OS spots a cycle of waiting processes and kills one of them. Which strategy is that?</p>
+<div class="options">
+<button class="opt" data-correct>detection and recovery</button>
+<button class="opt">structural prevention</button>
+<button class="opt">dynamic avoidance</button>
+<button class="opt">ignoring the problem</button>
+</div>
+<p class="why">The deadlock was allowed to happen, then found (detection) and broken (recovery). Prevention and avoidance stop it from happening in the first place.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it: exam answers</h2>
+<p>Practise these the way the exam will ask them. Write each answer on paper or in a text file <em>before</em> opening the model answer, then mark yourself. Recalling it is what makes it stick; reading it back doesn't.</p>
+
+<details class="recall"><summary>Q1. Define <em>concurrent</em> and <em>parallel</em>, with an example where they differ. (3 marks)</summary>
+<p>Parallel: two processes are executing at the same instant, which needs more than one processor. Concurrent: two processes have the potential to execute in parallel; their executions can overlap in any order. Example: two threads on a single-core CPU are concurrent (interleaved by the scheduler) but not parallel.</p></details>
+
+<details class="recall"><summary>Q2. State the four conditions for correct sharing via critical sections. (4 marks)</summary>
+<p>(1) No two processes inside their critical sections at the same time. (2) No assumptions about the speed or number of CPUs. (3) No process outside its critical section may block another. (4) No process waits forever to enter its critical section.</p></details>
+
+<details class="recall"><summary>Q3. Define deadlock, list Coffman's four conditions, and give one prevention technique. (6 marks)</summary>
+<p>Deadlock: a set of processes, each waiting for an event that only another process in the set can cause. Conditions: mutual exclusion, hold and wait, no pre-emption, circular wait. All four are necessary. Prevention: impose a global order on acquiring resources, which breaks circular wait.</p></details>
+
+<details class="recall"><summary>Q4. Give two advantages of concurrent programming and two problems it introduces. (4 marks)</summary>
+<p>Advantages (any two): solves larger problems faster using more CPUs and memory; models systems of independent tasks naturally (servers, embedded controllers); responds to aperiodic events; robustness, since one failed thread needn't stop the others. Problems (any two): non-determinism makes testing hard; race conditions on shared data; deadlock and starvation; too many threads can slow a program down.</p></details>
+
+<p>Marks are my estimate of a typical split, not taken from your exam. For real exam format, past papers are the best source; ask your lecturer if any exist.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> OSTEP (Arpaci-Dusseau), a free, widely used OS textbook. Read <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf">ch. 26</a> §26.3–26.4 (race conditions, critical sections) and <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf">ch. 32</a> §32.3 up to “Prevention” (the four deadlock conditions). About 15 minutes. Its examples are in C, but the ideas are the same as in Java.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>What does <code>volatile</code> guarantee? (lesson 2)</summary><p>Visibility: a write by one thread is seen by later reads in other threads.</p></details>
+<details class="recall"><summary>Coffman's four, in order.</summary><p>Mutual exclusion, hold and wait, no pre-emption, circular wait.</p></details>
+<details class="recall"><summary>Deadlock vs starvation in one sentence each.</summary><p>Deadlock: everyone in the set waits on each other, so nobody moves. Starvation: the others move, and one thread is left waiting forever.</p></details>
+
+<div class="next"><a href="0002-living-threads.html">← Lesson 2: living threads</a><span>Lesson 4: fair splitting (Deck 2) →</span></div>
+
+<footer class="ask">Want a different exam-style question, or think a model answer is too thin? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

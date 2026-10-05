@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Living Threads</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 2 of 7 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Living Threads</h1>
+<p class="subtitle">Pause a thread, see what state it's in, and stop it cleanly.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll stop a thread that's spinning flat out, and see why adding one keyword is the difference between <code>FAIL</code> and <code>PASS</code>. About 20 minutes.</p>
+
+<p>In <a href="0001-start-and-join.html">lesson 1</a> a thread was started, did its job, and finished. Slides 49–89 of Deck 1 cover what happens <em>while</em> a thread is running. Slide 49 lists ten thread methods. Only three of them matter much: <code>sleep</code>, thread states, and stopping. The rest fit in one table.</p>
+
+<h2>1 · <code>sleep()</code></h2>
+<p class="slides">Deck 1 · slides 50–56</p>
+
+<pre>try {
+    Thread.sleep(500);   // pause for 500 ms (1000 ms = 1 s)
+} catch (InterruptedException e) {
+    return;              // woken early: usually means "stop"
+}</pre>
+
+<p>Two facts that the slides leave out:</p>
+<ul>
+<li><strong><code>sleep</code> always pauses the current thread</strong>, meaning whichever thread runs that line. It's a <code>static</code> method, so <code>this.sleep(…)</code> on slides 50, 67 and 73 is misleading: if <code>main</code> called <code>t.sleep(1000)</code>, <code>main</code> would be the one that sleeps.</li>
+<li><strong>Why the <code>try/catch</code>?</strong> Another thread can <em>interrupt</em> a sleeping thread to wake it early, and <code>sleep</code> reports that by throwing <code>InterruptedException</code>. Java makes you handle it. Slide 53 handles it with <code>return</code>, which ends the thread.</li>
+</ul>
+<span class="sidenote">“<code>Thread.sleep</code> causes the current thread to suspend execution for a specified period.” <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/sleep.html">Oracle: Sleep</a>. On interrupts: “It's up to the programmer to decide exactly how a thread responds to an interrupt, but it is very common for the thread to terminate.” <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/interrupt.html">Oracle: Interrupts</a></span>
+
+<p>Slides 52–56: <code>countUp</code> sleeps 300 ms and <code>countDown</code> sleeps 500 ms, so their output interleaves at roughly a 5:3 ratio. The exact interleaving changes from run to run.</p>
+
+<h2>2 · The small helpers</h2>
+<p class="slides">Deck 1 · slides 59–65, 69–71</p>
+
+<div class="table-wrap"><table>
+<tr><th>Call</th><th>What it does</th></tr>
+<tr><td><code>t.setName("No:3")</code> / <code>t.getName()</code></td><td>Label a thread, e.g. for printing.</td></tr>
+<tr><td><code>t.getId()</code></td><td>A unique number the JVM assigns.</td></tr>
+<tr><td><code>Thread.currentThread()</code></td><td>Returns the <code>Thread</code> object that is running this line. Useful inside a <code>Runnable</code>, where there's no <code>this</code> thread.</td></tr>
+<tr><td><code>t.isAlive()</code></td><td><code>true</code> if started and not yet finished.</td></tr>
+<tr><td><code>Thread.yield()</code></td><td>A hint: “let someone else run now”.</td></tr>
+<tr><td><code>t.setPriority(1..10)</code></td><td>A hint to the scheduler. The OS may ignore it (slide 69).</td></tr>
+</table></div>
+
+<p>Slide 62 is worth a look: threads named <code>No:0</code>…<code>No:9</code> were started in order but printed out of order (<code>No:1</code> first). That's the scheduler at work, and it's why you can never rely on start order.</p>
+
+<h2>3 · Thread states</h2>
+<p class="slides">Deck 1 · slides 66–68</p>
+
+<p><code>t.getState()</code> returns one of six values. Here they are in the order a thread passes through them:</p>
+<div class="table-wrap"><table>
+<tr><th>State</th><th>Meaning</th></tr>
+<tr><td><code>NEW</code></td><td>Created, <code>start()</code> not called yet.</td></tr>
+<tr><td><code>RUNNABLE</code></td><td>Running, or ready to run as soon as the scheduler picks it.</td></tr>
+<tr><td><code>TIMED_WAITING</code></td><td>Paused for a set time: <code>sleep(ms)</code>, <code>join(ms)</code>.</td></tr>
+<tr><td><code>WAITING</code></td><td>Paused with no time limit, e.g. <code>join()</code>.</td></tr>
+<tr><td><code>BLOCKED</code></td><td>Waiting for a lock (covered in a later lecture).</td></tr>
+<tr><td><code>TERMINATED</code></td><td><code>run()</code> has finished.</td></tr>
+</table></div>
+<span class="sidenote">Slide 66 says <code>TIME_WAITING</code>; the real name is <code>TIMED_WAITING</code>. <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.State.html">Thread.State Javadoc</a></span>
+
+<p>Slide 68's program prints <code>NEW</code>, <code>RUNNABLE</code>, <code>TIMED_WAITING</code>, <code>TERMINATED</code>. I ran it to confirm. Try tracing it yourself in question 1 below.</p>
+
+<h2>4 · Stopping a thread</h2>
+<p class="slides">Deck 1 · slides 72–74, 86–88</p>
+
+<p>A thread stops when its <code>run()</code> returns. To stop one <em>from outside</em>, give it a flag to check (slide 73, EggTimer):</p>
+
+<pre>class EggTimer extends Thread {
+    private volatile boolean go = true;   // the key word
+    public void run() {
+        while (go) { /* work */ }
+    }
+    public void terminate() { go = false; }
+}</pre>
+
+<p><strong>Why <code>volatile</code>?</strong> Without it, the running thread is allowed to keep reading an old, cached value of <code>go</code>, so it might <em>never</em> see <code>main</code>'s <code>go = false</code>. <code>volatile</code> guarantees that a write by one thread is visible to the others.</p>
+<span class="sidenote">“Changes to a <code>volatile</code> variable are always visible to other threads.” <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/atomic.html">Oracle: Atomic Access</a></span>
+
+<div class="callout warn">
+<p>Slides 86 and 88 (<code>MessagePrinter</code>, <code>PrimeGenerator</code>) use a stop flag <em>without</em> <code>volatile</code>. That's a bug, even if those programs happen to work: printing and sleeping inside the loop often hide it. A tight loop with no printing exposes it, and that's what your exercise does.</p>
+</div>
+
+<h2>Check yourself</h2>
+<p>Answer from memory. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">Slide 68: <code>t</code> sleeps 4 s. Main starts it, sleeps 1 s, then prints <code>t.getState()</code>. What's printed?</p>
+<div class="options">
+<button class="opt" data-correct>TIMED_WAITING</button>
+<button class="opt">WAITING</button>
+<button class="opt">RUNNABLE</button>
+<button class="opt">BLOCKED</button>
+</div>
+<p class="why">After 1 s, <code>t</code> is still inside <code>sleep(4000)</code>, which is a pause with a time limit. A thread that's only waiting for a lock would be <code>BLOCKED</code>, and one paused with no time limit would be <code>WAITING</code>.</p>
+</div>
+
+<div class="quiz">
+<p class="q"><code>main</code> calls <code>t.sleep(1000)</code>, where <code>t</code> is another running thread. What happens?</p>
+<div class="options">
+<button class="opt" data-correct>main sleeps, t continues</button>
+<button class="opt">t sleeps, main continues</button>
+<button class="opt">both of them sleep 1s</button>
+<button class="opt">it is a compile error</button>
+</div>
+<p class="why"><code>sleep</code> is static and always pauses the <em>current</em> thread, which here is <code>main</code>. Writing it as <code>t.sleep</code> compiles but misleads, which is why <code>Thread.sleep(…)</code> is the clear way to write it.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Why is EggTimer's <code>go</code> flag declared <code>volatile</code>?</p>
+<div class="options">
+<button class="opt" data-correct>so the loop sees main's update</button>
+<button class="opt">so only one thread can write it</button>
+<button class="opt">so the loop runs much faster</button>
+<button class="opt">so the flag cannot be changed</button>
+</div>
+<p class="why"><code>volatile</code> is about <em>visibility</em>: one thread's write is guaranteed to reach another thread's read. It doesn't restrict who writes (that's locking, in a later lecture). If anything, it makes the loop slightly slower.</p>
+</div>
+
+<div class="quiz">
+<p class="q">You call <code>t.setPriority(Thread.MAX_PRIORITY)</code>. What does that guarantee?</p>
+<div class="options">
+<button class="opt" data-correct>a hint the OS may ignore</button>
+<button class="opt">always runs before others</button>
+<button class="opt">gets twice the CPU time</button>
+<button class="opt">can't be interrupted now</button>
+</div>
+<p class="why">Slide 69: “the underlying operating system can influence the order in which threads are executed.” Priority is a hint, never a guarantee.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Why do the slides wrap every <code>sleep</code> in <code>try/catch</code>?</p>
+<div class="options">
+<button class="opt" data-correct>it can be woken up early</button>
+<button class="opt">the sleep may fail to start</button>
+<button class="opt">the time might be negative</button>
+<button class="opt">the OS might reject sleep</button>
+</div>
+<p class="why">An interrupt from another thread ends the sleep early and throws <code>InterruptedException</code>, which Java makes you catch or declare.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0002/StopMe.java"><code>lessons/code/0002/StopMe.java</code></a>. A <code>Worker</code> counts as fast as it can. <code>main</code> lets it run for 0.3 s, calls <code>terminate()</code>, and checks that it actually stopped.</p>
+<pre class="language-bash">cd lessons/code/0002
+java StopMe.java</pre>
+<p>Do <strong>TODO 2 first</strong> and run it. It should still <code>FAIL</code>; that failure is the whole point of this exercise. Then do TODO 1 and get <code>PASS</code>.</p>
+<span class="sidenote">On my machine, setting the flag without <code>volatile</code> failed 3 runs out of 3. The Java rules <em>allow</em> the loop to never see the change. It isn't guaranteed to hang everywhere, which is exactly what makes this kind of bug nasty.</span>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>TODO 2 is one assignment. TODO 1 is one keyword, and section 4 above tells you which.</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>private volatile boolean running = true;
+...
+public void terminate() { running = false; }</pre>
+<p>Without <code>volatile</code>, the JIT compiler is allowed to read <code>running</code> once and turn the loop into <code>while (true)</code>. The write from <code>main</code> happens, but the worker never looks again.</p>
+</details>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> Oracle's Java Tutorial: <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/sleep.html">Pausing Execution with Sleep</a> → <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/interrupt.html">Interrupts</a> → <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/atomic.html">Atomic Access</a> (just the <code>volatile</code> paragraph). About 10 minutes.</p>
+<p>Then try the slides' own exercises, <strong>Deck 1 slides 84–89</strong>. For each one, ask: how does this thread stop, and would the stop be <em>seen</em>?</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Which thread does <code>x.sleep(100)</code> pause?</summary><p>The current thread, whoever runs that line. <code>sleep</code> is static, and the <code>x.</code> is ignored.</p></details>
+<details class="recall"><summary>Name the six thread states in order.</summary><p><code>NEW</code> → <code>RUNNABLE</code> → <code>BLOCKED</code> / <code>WAITING</code> / <code>TIMED_WAITING</code> → <code>TERMINATED</code>.</p></details>
+<details class="recall"><summary>How do you stop a thread from outside, and what does the flag need?</summary><p>Have <code>run()</code> loop on a boolean flag and give the class a method that sets it to false. The flag must be <code>volatile</code> so the running thread sees the change.</p></details>
+<details class="recall"><summary>From lesson 1: what are the four steps of the pattern?</summary><p>Split → start all → join all → combine.</p></details>
+
+<div class="next"><a href="0001-start-and-join.html">← Lesson 1: start and join</a><a href="0003-theory-pack.html">Lesson 3: theory pack →</a></div>
+
+<footer class="ask">Anything unclear, a slide that still doesn't make sense, or a compile error you can't read? Ask your teacher (the agent) in the terminal. That's what it's for.</footer>
+</main>
+</body>
+</html>

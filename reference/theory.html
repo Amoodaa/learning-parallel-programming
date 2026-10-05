@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Theory Sheet</title>
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="course-map.html">Course map</a> · <a href="glossary.html">Glossary</a> · <a href="../lessons/0003-theory-pack.html">Lesson 3</a></nav>
+
+<h1>Theory Sheet</h1>
+<p class="subtitle">Lecture 1's exam theory on one page.</p>
+
+<h2>Concurrent vs parallel <span class="slides">D1 s8–10</span></h2>
+<div class="table-wrap"><table>
+<tr><th>Term</th><th>Definition</th></tr>
+<tr><td>Parallel</td><td>Executing at the same instant. Needs at least 2 processors.</td></tr>
+<tr><td>Concurrent</td><td>Has the potential to execute in parallel; the executions can overlap. Parallel ⇒ concurrent.</td></tr>
+<tr><td>Three forms</td><td>(1) one shared CPU · (2) many CPUs, shared memory · (3) many CPUs, distributed</td></tr>
+<tr><td>Scheduler</td><td>Decides which process runs and for how long when processes outnumber processors.</td></tr>
+<tr><td>CPU- vs I/O-bound</td><td>Spends its time computing vs waiting on devices.</td></tr>
+</table></div>
+
+<h2>Why concurrency <span class="slides">D1 s7, 11, 19–23</span></h2>
+<p>Speed and scale (bigger problems, faster) · modelling independent tasks (servers, controllers) · aperiodic events (sleep until an alarm) · robustness (one thread failing needn't stop the others).</p>
+
+<h2>Problems <span class="slides">D1 s24, 31</span></h2>
+<p>Non-determinism (hard to test) · sharing violations and race conditions · too many threads slows things down · not knowing what is atomic · mutable shared state · locking too much.</p>
+
+<h2>Critical section: 4 rules <span class="slides">D1 s27</span></h2>
+<ol>
+<li>No two processes inside their critical sections at the same time.</li>
+<li>No assumptions about the speed or number of CPUs.</li>
+<li>No process outside its critical section may block others.</li>
+<li>No process waits forever to enter.</li>
+</ol>
+
+<h2>Deadlock <span class="slides">D1 s28–30</span></h2>
+<p><strong>Definition</strong> (Tanenbaum): a set of processes, each waiting for an event that only another process in the set can cause.</p>
+<p><strong>Coffman: all four are necessary.</strong></p>
+<ol>
+<li>Mutual exclusion: each resource is held by at most one process.</li>
+<li>Hold and wait: a process holds resources while requesting more.</li>
+<li>No pre-emption: only the holder can release a resource.</li>
+<li>Circular wait: a cycle of processes, each waiting on the next.</li>
+</ol>
+<p><strong>Strategies:</strong> ignore · detect and recover · dynamic avoidance · prevention (negate one condition, e.g. a fixed acquisition order breaks circular wait).</p>
+<p><strong>Starvation:</strong> one process waits forever while the others progress (not defined on the slides).</p>
+
+<h2>History <span class="slides">D1 s32–33</span></h2>
+<p>1960s: CPU/device overlap · Dijkstra 1965: <em>Cooperating Sequential Processes</em>, semaphores, mutual exclusion, <code>parbegin … parend</code> · Hoare 1971 · monitors (Brinch Hansen &amp; Hoare 1973) · Concurrent Pascal 1975.</p>
+
+<p class="slides">Sources: Deck 1 slides as marked; <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf">OSTEP ch. 26</a>; <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf">OSTEP ch. 32</a>.</p>
+</main>
+</body>
+</html>

@@ -9,3 +9,5 @@
 - Lesson plan (7 lessons) is in course-map.html. Update it when new slides arrive.
 - Prefers simple typography: system sans-serif and system monospace, no web fonts, no italic or small-caps styling.
 - Code blocks get syntax highlighting via assets/highlight.js (highlight.js 11.11.1 from cdnjs; Java/C/bash bundled). Keep code lines short enough to avoid horizontal scroll (~60 chars).
+- Theory lessons (e.g. 0003) swap the PASS/FAIL Java exercise for exam-style written answers with model answers in collapsed recall cards; a runnable demo (Race.java) may illustrate, without a fix that belongs to a later lecture.
+- Each lesson ends with "Next time, from memory" cards that include at least one from an earlier lesson (spacing).

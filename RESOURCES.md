@@ -7,6 +7,8 @@
   Short official pages covering almost exactly the slides' Java topics (threads, sleep, join, sync, deadlock, executors, pools, fork/join). Use for: the explanations the slides leave out. Primary reading for most lessons.
 - [Java SE 21 API Javadoc: java.lang.Thread](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html), [Thread.State](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.State.html), [RecursiveAction](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/RecursiveAction.html)
   Use for: settling exact method behaviour and correcting slide errors.
+- [OSTEP (Arpaci-Dusseau), *Operating Systems: Three Easy Pieces*, ch. 26 Concurrency: An Introduction](https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf) and [ch. 32 Common Concurrency Problems](https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf)
+  Free, widely used OS textbook; examples in C. Use for: critical sections, race conditions, deadlock conditions/prevention (lesson 3), and later the C half.
 - Book: Brian Goetz, *Java Concurrency in Practice* (Addison-Wesley, 2006). On the course reading list (Deck 1 s2). Use for: deeper "why" on visibility/volatile and thread pools, only when a slide needs it.
 
 ## Wisdom (Communities)
