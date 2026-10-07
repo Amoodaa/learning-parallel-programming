@@ -8,41 +8,51 @@
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../lessons/0001-start-and-join.html">Lesson 1</a> · <a href="glossary.html">Glossary</a> · <a href="thread-basics.html">Thread basics</a> · <a href="theory.html">Theory sheet</a></nav>
+<nav class="crumbs" aria-label="Site navigation"><a href="../index.html">Home</a> · <a href="glossary.html">Glossary</a> · <a href="thread-basics.html">Thread basics</a> · <a href="theory.html">Theory sheet</a></nav>
 
-<h1>Course Map</h1>
-<p class="subtitle">How the slides fit together, and what each group of slides is for.</p>
+<h1>Course map</h1>
+<p class="subtitle">Seven short lessons. Follow them in order.</p>
 
-<p>The slides were written to be talked over, so the narration that links one slide to the next is missing. This page puts it back: each deck is grouped into topics, and each topic gets one line saying what it is really about. The <strong>Need</strong> column tells you how much attention it deserves.</p>
+<ol class="course-route">
+<li><a href="../lessons/0001-start-and-join.html">Start and join</a><span>Make a thread, wait for it, read its result.</span></li>
+<li><a href="../lessons/0002-living-threads.html">Living threads</a><span>Sleep, thread states, and stopping with a flag.</span></li>
+<li><a href="../lessons/0003-theory-pack.html">Theory pack</a><span>Concurrency, critical sections, and deadlock.</span></li>
+<li><strong>Fair splitting</strong> <small>Planned</small><span>Divide work fairly; use one thread per core.</span></li>
+<li><strong>Thread pools</strong> <small>Planned</small><span>Submit tasks and get results with a Future.</span></li>
+<li><strong>Uneven work</strong> <small>Planned</small><span>Use small tasks so workers don't sit idle.</span></li>
+<li><strong>Fork/Join</strong> <small>Planned</small><span>Split tasks recursively and combine results.</span></li>
+</ol>
+<p class="slides">Lessons 1–3 cover Deck 1. Lessons 4–7 will cover Deck 2. Only the two decks below are in scope.</p>
 
-<p><strong>Need:</strong> ★★★ core: assignment and exam both use it · ★★ likely exam theory · ★ background, skim it</p>
+<details class="recall">
+<summary>Deck 1 · slide guide</summary>
 
-<h2>Deck 1 · Lecture_1_MSCC_PDP_Introduction</h2>
-<p>This deck is three things in a row: <em>why</em> concurrency exists, the <em>problems</em> it causes, and a tour of the Java <code>Thread</code> API. The order jumps around, so the table regroups it.</p>
+<p><a href="../source-materials/Lecture_1_MSCC_PDP_Introduction.pptx">Download Introduction slides</a>. Why concurrency exists, what can go wrong, and the Java Thread API.</p>
+<ul>
+<li>1–4: course admin. Skim.</li>
+<li>5–7, 11, 16, 19–23: why concurrency. <a href="../lessons/0003-theory-pack.html">Lesson 3</a>.</li>
+<li>8–10, 12–13, 35–41: process, thread, and scheduling vocabulary. <a href="../lessons/0001-start-and-join.html">Lesson 1</a>.</li>
+<li>14–15: languages and paradigms. Skim.</li>
+<li>17–18: parallel search preview. <a href="../lessons/0001-start-and-join.html">Lesson 1</a>. See errata.</li>
+<li>24–31: non-determinism, critical sections, and deadlock. <a href="../lessons/0003-theory-pack.html">Lesson 3</a>.</li>
+<li>32–33: semaphore and monitor history. <a href="theory.html">Theory sheet</a>. Skim.</li>
+<li>42–48: creating a thread. <a href="../lessons/0001-start-and-join.html">Lesson 1</a>.</li>
+<li>49–56: sleep. <a href="../lessons/0002-living-threads.html">Lesson 2</a>.</li>
+<li>57–58: join. <a href="../lessons/0001-start-and-join.html">Lesson 1</a>.</li>
+<li>59–65: names, IDs, currentThread, and yield. <a href="../lessons/0002-living-threads.html">Lesson 2</a>.</li>
+<li>66–68: thread states. <a href="../lessons/0002-living-threads.html">Lesson 2</a>.</li>
+<li>69–71: priority is only a hint. <a href="../lessons/0002-living-threads.html">Lesson 2</a>. Skim.</li>
+<li>72–74: stopping with a volatile flag. <a href="../lessons/0002-living-threads.html">Lesson 2</a>.</li>
+<li>75–83: getting a result back. <a href="../lessons/0001-start-and-join.html">Lesson 1</a> and <a href="../lessons/0002-living-threads.html">lesson 2</a>.</li>
+<li>84–89: stopping exercises. <a href="../lessons/0002-living-threads.html">Lesson 2</a>.</li>
+<li>90–95: toy CPU scheduler. Skip unless assigned; see errata.</li>
+</ul>
+</details>
 
-<div class="table-wrap"><table>
-<tr><th>Slides</th><th>Topic</th><th>What it's really saying</th><th>Need</th><th>Lesson</th></tr>
-<tr><td>1–4</td><td>Admin</td><td>Reading list; course content (Java first, then C with OpenMP/MPI); 50% assignments (Java + C), 50% exam (theory + coding).</td><td>★</td><td>—</td></tr>
-<tr><td>5–7, 11, 16, 19–23</td><td>Why concurrency</td><td>Two reasons: <em>speed</em> (more cores, bigger problems) and <em>modelling</em> (a system with independent jobs, like two sensors polled at different rates, is easier to write with one thread per job). Robustness: one thread failing needn't kill the others.</td><td>★★</td><td><a href="../lessons/0003-theory-pack.html">3</a></td></tr>
-<tr><td>8–10, 12–13, 35–41</td><td>Vocabulary</td><td>Process vs thread; concurrent vs parallel; the scheduler decides who runs; CPU-bound vs I/O-bound; threads share the heap, each has its own stack.</td><td>★★★</td><td><a href="../lessons/0001-start-and-join.html">1</a></td></tr>
-<tr><td>14–15</td><td>Languages &amp; paradigms</td><td>Lots of languages have threads; Java mixes OO and functional styles.</td><td>★</td><td>—</td></tr>
-<tr><td>17–18</td><td>Parallel search teaser</td><td>A preview of Deck 2, slides 2–7. The code is broken (see errata). Notice the comment <code>// wait for search to end</code>: that is <code>join()</code>.</td><td>★★</td><td><a href="../lessons/0001-start-and-join.html">1</a></td></tr>
-<tr><td>24–31</td><td>What goes wrong</td><td>Non-determinism (the same program gives different output), critical sections and the 4 conditions for correct sharing, deadlock (Coffman's 4 conditions plus 4 ways to deal with it). <em>A preview: the details come in later lectures.</em></td><td>★★</td><td><a href="../lessons/0003-theory-pack.html">3</a></td></tr>
-<tr><td>32–33</td><td>History</td><td>Dijkstra (semaphores, 1965), Hoare and Brinch Hansen (monitors, 1973).</td><td>★</td><td><a href="../lessons/0003-theory-pack.html">3</a></td></tr>
-<tr><td>42–48</td><td>Creating a thread</td><td>Two ways: <code>extends Thread</code> or <code>implements Runnable</code>. Both put the work in <code>run()</code>; <code>start()</code> launches it.</td><td>★★★</td><td><a href="../lessons/0001-start-and-join.html">1</a></td></tr>
-<tr><td>49–56</td><td>sleep()</td><td>Pause the <em>current</em> thread for some milliseconds. Two counters with different sleeps interleave their output.</td><td>★★★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
-<tr><td>57–58</td><td>join()</td><td>Wait for another thread to finish.</td><td>★★★</td><td><a href="../lessons/0001-start-and-join.html">1</a></td></tr>
-<tr><td>59–65</td><td>Names, ids, currentThread, yield</td><td>Small helper methods. The ids printed on slide 62 come out in a jumbled order because of non-determinism.</td><td>★★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
-<tr><td>66–68</td><td>Thread states</td><td>NEW → RUNNABLE → (BLOCKED / WAITING / TIMED_WAITING) → TERMINATED.</td><td>★★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
-<tr><td>69–71</td><td>Priority</td><td>1–10. It's only a hint, and the OS can ignore it.</td><td>★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
-<tr><td>72–74</td><td>Stopping a thread</td><td>Let <code>run()</code> return. To stop a thread from outside, set a <code>volatile boolean</code> flag that it checks.</td><td>★★★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
-<tr><td>75–83</td><td>Getting a result back</td><td>"Asynchronous procedure" = start a thread, join it, then read a field through a <code>getResult()</code> method (or a shared <code>Result</code> object).</td><td>★★★</td><td><a href="../lessons/0001-start-and-join.html">1</a>, <a href="../lessons/0002-living-threads.html">2</a></td></tr>
-<tr><td>84–89</td><td>Exercises</td><td>Practice on stopping threads. The ones without <code>volatile</code> are trick questions (lesson 2).</td><td>★★</td><td><a href="../lessons/0002-living-threads.html">2</a></td></tr>
-<tr><td>90–95</td><td>CPU scheduler</td><td>A toy round-robin scheduler built from priorities. Hard to follow and buggy, so skip unless it's assigned.</td><td>★</td><td>—</td></tr>
-</table></div>
-
-<h2>Deck 2 · ElementaryParallelism</h2>
-<p>This deck <em>does</em> tell one story, but no slide says so. The story is: <strong>split a job across threads, then keep fixing what goes wrong.</strong> Each example exists to show the next problem.</p>
+<details class="recall">
+<summary>Deck 2 · slide guide</summary>
+<p><a href="../source-materials/ElementaryParallelism.pptx">Download Elementary parallelism slides</a>. Split work, measure it, then fix the bottlenecks.</p>
+<p class="slides">Lesson 4: slides 2–41 · Lesson 5: 43–72 · Lesson 6: 73–78 · Lesson 7: 79–99. Slide 1 is the title; slide 42 is a divider.</p>
 
 <ol class="steps">
 <li><strong>Split, start, join, combine</strong> (slides 2–7). Two threads search two halves of an array. <em>Problem:</em> with 100 elements, creating the threads costs more than the search itself (5). A shared <code>Found</code> object lets one thread tell the other to stop early (6–7).</li>
@@ -58,22 +68,13 @@
 </ol>
 
 <p>Read top to bottom, this is the course's main skill: <strong>split work fairly, use the right number of threads, wait for the results, combine them.</strong> Everything in Deck 1's Thread API section exists to support it.</p>
+</details>
 
-<h2>Lesson plan</h2>
-<p>Built only from these two decks. When new slides arrive (synchronisation, locks, semaphores, then C/OpenMP/MPI), they get added here.</p>
-<ol>
-<li><a href="../lessons/0001-start-and-join.html">Start and join</a>: make a thread, wait for it, read its result.</li>
-<li><a href="../lessons/0002-living-threads.html">Living threads</a>: sleep, states, stopping with a <code>volatile</code> flag.</li>
-<li><a href="../lessons/0003-theory-pack.html">Theory pack</a>: concurrent vs parallel, critical-section rules, deadlock conditions. <em>Lessons 1–3 complete Deck 1.</em></li>
-<li>Fair splitting: <code>j*N/k</code>, threads = cores.</li>
-<li>Thread pools, <code>Callable</code>, and <code>Future</code>.</li>
-<li>Uneven work: small tasks in a pool.</li>
-<li>Fork/Join.</li>
-</ol>
-
+<details class="recall">
+<summary>Slide errata · 9 corrections</summary>
 <h2 id="errata">Slide errata</h2>
-<p>If a slide confused you, it may be because the slide is wrong. Errors I found:</p>
-<div class="table-wrap"><table>
+<p>Known mistakes in the slides and what to use instead.</p>
+<div class="table-wrap"><table class="errata">
 <tr><th>Where</th><th>Problem</th><th>Correct version</th></tr>
 <tr><td>D1 s17</td><td><code>int f = new int[1000]</code>; <code>new Thread(Search(...)</code> is missing a <code>)</code>; the search writes its answer into a <code>Boolean</code>, but <code>Boolean</code> is immutable, so the thread can't change main's copy.</td><td><code>int[] f</code>. Deck 2 fixes the rest with a <code>Searcher</code> class and <code>getResult()</code>.</td></tr>
 <tr><td>D1 s46–47</td><td><code>k++</code> missing <code>;</code>. <code>new Thread(p).</code> has a stray dot. Curly quote <code>”</code>.</td><td><code>k++;</code> and <code>new Thread(p);</code></td></tr>
@@ -85,8 +86,8 @@
 <tr><td>D2 s39</td><td><code>base = MAX/numProc</code>, so the leftover <code>MAX % numProc</code> numbers are never checked.</td><td>This is why slide 22 introduces <code>j*N/k</code>.</td></tr>
 <tr><td>D2 s84</td><td><code>RecursiveAction&lt;V&gt;</code></td><td><code>RecursiveAction</code> takes no type parameter; <code>compute()</code> returns <code>void</code> (<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/RecursiveAction.html">Javadoc</a>).</td></tr>
 </table></div>
+</details>
 
-<footer class="ask">If something here doesn't match your reading of the slides, ask your teacher (the agent).</footer>
 </main>
 </body>
 </html>
