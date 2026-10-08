@@ -115,6 +115,57 @@
 
 <dt>Uneven work</dt>
 <dd>Equal-sized pieces that take different times (large primes cost more), so some threads finish early and sit idle (D2 s77). Fix: many small tasks in a pool (s78). <a href="../lessons/0006-uneven-work.html">Lesson 6</a>.</dd>
+
+<dt>Fork/Join</dt>
+<dd>A task that solves small problems directly and otherwise splits itself, forks the parts, joins them and combines the results (D2 s80). <a href="../lessons/0007-fork-join.html">Lesson 7</a>.</dd>
+
+<dt><code>RecursiveTask&lt;V&gt;</code> / <code>RecursiveAction</code></dt>
+<dd>Fork/Join task types; override <code>compute()</code>, which returns a <code>V</code> / nothing.</dd>
+
+<dt>Work stealing</dt>
+<dd>Each <code>ForkJoinPool</code> thread has its own task queue; a thread with nothing left takes tasks from another's queue (D2 s82).</dd>
+</dl>
+
+<h2>Locks &amp; safe sharing</h2>
+<dl>
+<dt>Lock (intrinsic)</dt>
+<dd>Every object has one. <code>synchronized (obj) { … }</code> lets one thread at a time hold it; others wait (D3 s5). <a href="../lessons/0008-synchronized.html">Lesson 8</a>.</dd>
+
+<dt>Synchronized method</dt>
+<dd>Locks <code>this</code> for the whole body; a <code>static</code> one locks the class object, e.g. <code>Counter.class</code> (D3 s21, s38).</dd>
+
+<dt>Compound action</dt>
+<dd>Several steps that must happen as one, like check-then-act or read-modify-write (<code>count++</code>) (D3 s27).</dd>
+
+<dt>Class invariant</dt>
+<dd>A rule that must always hold between fields, e.g. <code>x == y</code>; updates to them must be atomic together (D3 s28).</dd>
+
+<dt>Visibility</dt>
+<dd>Whether a write by one thread is seen by others. Guaranteed by taking the same lock, or by <code>volatile</code> (D3 s30–32). <a href="../lessons/0009-visibility-and-locks.html">Lesson 9</a>.</dd>
+
+<dt>Reentrant</dt>
+<dd>A thread holding a lock can take it again, e.g. one synchronized method calling another on the same object (D3 s44).</dd>
+
+<dt>Monitor</dt>
+<dd>Data plus a lock giving one thread at a time access, plus a queue of threads waiting to enter. A Java object with synchronized methods is one (D3 s48).</dd>
+
+<dt>Immutable</dt>
+<dd>Can't change after construction (<code>final</code> class, <code>private final</code> fields, no setters), so safe to share without locks (D3 s55). <a href="../lessons/0010-thread-safe-classes.html">Lesson 10</a>.</dd>
+
+<dt>Leaked reference</dt>
+<dd>Handing out a reference to internal mutable data, which callers can then change outside the lock. Fix: copy in, copy out (D3 s58–59).</dd>
+
+<dt>Coarse- / fine-grained locking</dt>
+<dd>One lock for the whole structure / a lock per part, e.g. <code>locks[j]</code>. Fine allows more concurrency but risks deadlock (D3 s62).</dd>
+
+<dt>Resource ordering</dt>
+<dd>Every thread takes locks in the same fixed order, which breaks circular wait (D3 s70). <a href="../lessons/0011-deadlock-and-lock.html">Lesson 11</a>.</dd>
+
+<dt>Livelock</dt>
+<dd>Threads aren't blocked but keep reacting to each other and make no progress (D3 s76).</dd>
+
+<dt><code>ReentrantLock</code></dt>
+<dd>An explicit lock: <code>lock()</code>, then <code>try { … } finally { unlock(); }</code>. Same guarantees as <code>synchronized</code>, plus <code>tryLock()</code> and an optional fair mode (D3 s77–88).</dd>
 </dl>
 </main>
 </body>

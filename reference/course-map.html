@@ -11,7 +11,7 @@
 <nav class="crumbs" aria-label="Site navigation"><a href="../index.html">Home</a> · <a href="glossary.html">Glossary</a> · <a href="thread-basics.html">Thread basics</a> · <a href="theory.html">Theory sheet</a></nav>
 
 <h1>Course map</h1>
-<p class="subtitle">Seven short lessons. Follow them in order.</p>
+<p class="subtitle">Eleven short lessons. Follow them in order.</p>
 
 <ol class="course-route">
 <li><a href="../lessons/0001-start-and-join.html">Start and join</a><span>Make a thread, wait for it, read its result.</span></li>
@@ -20,9 +20,13 @@
 <li><a href="../lessons/0004-fair-splitting.html">Fair splitting</a><span>Divide work fairly; use one thread per core.</span></li>
 <li><a href="../lessons/0005-thread-pools.html">Thread pools</a><span>Submit tasks and get results with a Future.</span></li>
 <li><a href="../lessons/0006-uneven-work.html">Uneven work</a><span>Use small tasks so workers don't sit idle.</span></li>
-<li><strong>Fork/Join</strong> <small>Planned</small><span>Split tasks recursively and combine results.</span></li>
+<li><a href="../lessons/0007-fork-join.html">Fork/Join</a><span>Split tasks recursively; idle threads steal work.</span></li>
+<li><a href="../lessons/0008-synchronized.html">Synchronized</a><span>Lock shared data and stop losing updates.</span></li>
+<li><a href="../lessons/0009-visibility-and-locks.html">Visibility and locks</a><span>volatile vs locks, static locks, reentrancy, monitors.</span></li>
+<li><a href="../lessons/0010-thread-safe-classes.html">Thread-safe classes</a><span>No leaked references, immutability, coarse vs fine locks.</span></li>
+<li><a href="../lessons/0011-deadlock-and-lock.html">Deadlock and Lock</a><span>Lock ordering, ReentrantLock, tryLock.</span></li>
 </ol>
-<p class="slides">Lessons 1–3 cover Deck 1. Lessons 4–6 cover Deck 2 up to slide 78; lesson 7 (Fork/Join) is still to come. Only the two decks below are in scope.</p>
+<p class="slides">Lessons 1–3 cover Deck 1, lessons 4–7 Deck 2, and lessons 8–11 Deck 3. Only the three decks below are in scope.</p>
 
 <details class="recall">
 <summary>Deck 1 · slide guide</summary>
@@ -71,7 +75,30 @@
 </details>
 
 <details class="recall">
-<summary>Slide errata · 9 corrections</summary>
+<summary>Deck 3 · slide guide</summary>
+<p><a href="../source-materials/SharingResources.ppt">Download Sharing resources slides</a>. What to do when threads must share data: locks, visibility, safe class design, deadlock.</p>
+<p class="slides">Lesson 8: slides 2–29 · Lesson 9: 30–49 · Lesson 10: 50–67 · Lesson 11: 68–101. Slide 1 is the title.</p>
+<ul>
+<li>2–4: two threads printing at once. <a href="../lessons/0008-synchronized.html">Lesson 8</a>.</li>
+<li>5–12: <code>synchronized</code> blocks and lock objects. <a href="../lessons/0008-synchronized.html">Lesson 8</a>.</li>
+<li>13–19: atomic actions and the lost update (finishes lesson 3's <code>Race.java</code>). <a href="../lessons/0008-synchronized.html">Lesson 8</a>. See errata.</li>
+<li>20–24: synchronized methods and the intrinsic lock. <a href="../lessons/0008-synchronized.html">Lesson 8</a>.</li>
+<li>25–29: bank account, compound actions, class invariants. <a href="../lessons/0008-synchronized.html">Lesson 8</a>.</li>
+<li>30–32: visibility. <a href="../lessons/0009-visibility-and-locks.html">Lesson 9</a>.</li>
+<li>33–36: stopping a thread: <code>volatile</code> vs a lock. <a href="../lessons/0009-visibility-and-locks.html">Lesson 9</a>. See errata.</li>
+<li>37–43: static methods lock the class. <a href="../lessons/0009-visibility-and-locks.html">Lesson 9</a>.</li>
+<li>44–49: reentrant locks and monitors. <a href="../lessons/0009-visibility-and-locks.html">Lesson 9</a>.</li>
+<li>50–61: the library: leaked references, immutable and copied books. <a href="../lessons/0010-thread-safe-classes.html">Lesson 10</a>. See errata.</li>
+<li>62–67: coarse- vs fine-grained locking; dangers when sharing. <a href="../lessons/0010-thread-safe-classes.html">Lesson 10</a>.</li>
+<li>68–76: deadlock, lock ordering in the shuffler, starvation and livelock. <a href="../lessons/0011-deadlock-and-lock.html">Lesson 11</a>.</li>
+<li>77–91: <code>Lock</code>, <code>ReentrantLock</code>, the theatre, fairness, <code>tryLock</code>. <a href="../lessons/0011-deadlock-and-lock.html">Lesson 11</a>.</li>
+<li>92–101: practice programs (Summer/Swapper, Counter, Garden). Questions and answers at the end of <a href="../lessons/0011-deadlock-and-lock.html">lesson 11</a>.</li>
+</ul>
+<p>Read top to bottom: <strong>shared data needs a lock; the lock must cover the whole action and every access; it also makes changes visible; design classes so nothing escapes the lock; and when you need two locks, take them in a fixed order.</strong></p>
+</details>
+
+<details class="recall">
+<summary>Slide errata · 14 corrections</summary>
 <h2 id="errata">Slide errata</h2>
 <p>Known mistakes in the slides and what to use instead.</p>
 <div class="table-wrap"><table class="errata">
@@ -81,10 +108,16 @@
 <tr><td>D1 s50, 67, 73</td><td><code>this.sleep(...)</code> looks like it sleeps "this" thread object.</td><td><code>sleep</code> is static and always pauses the <em>current</em> thread (<a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/sleep.html">Oracle</a>). Write <code>Thread.sleep(...)</code>.</td></tr>
 <tr><td>D1 s66</td><td><code>TIME_WAITING</code></td><td><code>TIMED_WAITING</code> (<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.State.html">Javadoc</a>)</td></tr>
 <tr><td>D1 s93</td><td><code>removeThread</code> never increments <code>j</code>, so it loops forever unless the match is at index 0.</td><td>Add <code>j++</code> in the else branch.</td></tr>
-<tr><td>D2 s7, D1 s86–88</td><td>A <code>boolean</code> flag shared between threads with no <code>volatile</code>: the other thread may never see the change.</td><td>Covered in <a href="../lessons/0002-living-threads.html">lesson 2</a>. D1 s73 does it right with <code>volatile</code>.</td></tr>
+<tr><td>D2 s7, D1 s86–88, D3 s93</td><td>A <code>boolean</code> flag shared between threads with no <code>volatile</code>: the other thread may never see the change.</td><td>Covered in <a href="../lessons/0002-living-threads.html">lesson 2</a>. D1 s73 does it right with <code>volatile</code>.</td></tr>
 <tr><td>D2 s26</td><td>Calls <code>new RankerNoDup(data, copy, from, to)</code>, but slide 18 only defines a 3-argument constructor.</td><td>The worker has to loop <code>i</code> over its own segment (the slides don't show this).</td></tr>
 <tr><td>D2 s39</td><td><code>base = MAX/numProc</code>, so the leftover <code>MAX % numProc</code> numbers are never checked.</td><td>This is why slide 22 introduces <code>j*N/k</code>.</td></tr>
 <tr><td>D2 s84</td><td><code>RecursiveAction&lt;V&gt;</code></td><td><code>RecursiveAction</code> takes no type parameter; <code>compute()</code> returns <code>void</code> (<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/RecursiveAction.html">Javadoc</a>).</td></tr>
+<tr><td>D2 s98</td><td>Calls <code>left.join(); right.join();</code> after <code>invokeAll(left, right)</code>.</td><td>Harmless but unnecessary: <code>invokeAll</code> already waits for both (<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ForkJoinTask.html">Javadoc</a>).</td></tr>
+
+<tr><td>D3 s6, s100</td><td>Curly quotes <code>“</code> and <code>”</code> around strings.</td><td>Straight quotes <code>"</code>, or the code won't compile.</td></tr>
+<tr><td>D3 s13</td><td>Says <code>long</code> and <code>double</code> need two reads and two writes.</td><td>Only when not <code>volatile</code>; <code>volatile long</code>/<code>double</code> reads and writes are atomic (<a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.7">JLS §17.7</a>).</td></tr>
+<tr><td>D3 s35</td><td>Offers <code>synchronized void terminate()</code> as a solution on its own.</td><td>The loop reading <code>go</code> must take the same lock, or <code>go</code> must be <code>volatile</code>. Writer-only locking never stopped the thread when tested on Java 26 (<a href="../lessons/0009-visibility-and-locks.html">lesson 9</a>).</td></tr>
+<tr><td>D3 s55</td><td><code>if(!(p instanceof Book) return false;</code> is missing a <code>)</code>.</td><td><code>if (!(p instanceof Book)) return false;</code></td></tr>
 </table></div>
 </details>
 

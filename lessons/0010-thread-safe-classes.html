@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thread-Safe Classes</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 10 of 11 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Thread-Safe Classes</h1>
+<p class="subtitle">Design a class that stays safe however it's shared: don't leak references, prefer immutable objects, and choose how big each lock should be.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll give an array one lock per element and see it run about 7× faster than one lock for the whole array, with the same correct total. About 20 minutes.</p>
+
+<p>Deck 3 slides 50–67 are one long example (a library of books) followed by a speed comparison (a shared array). The library answers “what can still go wrong after every method is <code>synchronized</code>?” The array answers “how much should one lock cover?”</p>
+
+<h2>1 · The rule</h2>
+<p class="slides">Deck 3 · slide 50</p>
+
+<p>A class that is shared between threads must be properly <strong>encapsulated</strong>, must <strong>not leak references</strong> to its internal data, and each object it hands out must be either <strong>thread-safe</strong> or <strong>immutable</strong>. The rest of the library example shows each of these.</p>
+
+<h2>2 · The leak</h2>
+<p class="slides">Deck 3 · slides 51–54</p>
+
+<p>Slides 51–53's <code>Library</code> keeps its books in a private <code>ArrayList</code> and makes every method <code>synchronized</code>. That looks safe. But <code>get(title)</code> returns the actual <code>Book</code> object stored inside the list. The caller now holds a reference to the library's internal data, and can use it <strong>outside the library's lock</strong>. If <code>Book</code> can be changed, the lock no longer protects it. Slide 54 asks the question: should <code>Book</code> be immutable, or thread-safe?</p>
+
+<h2>3 · Option A: make it immutable</h2>
+<p class="slides">Deck 3 · slides 55–56</p>
+
+<pre>final class Book implements Comparable&lt;Book&gt; {
+    private final String title;
+    Book(String t) { title = t; }
+    public String title() { return title; }
+    // equals, hashCode, compareTo use title
+}</pre>
+
+<p>An <strong>immutable</strong> object can't change after construction, so any number of threads can read it with no lock at all. Nothing to race on, nothing to go stale. The recipe:</p>
+<ul>
+<li><code>final class</code>: nobody can write a mutable subclass.</li>
+<li><code>private final</code> fields, set once in the constructor.</li>
+<li>No setters.</li>
+</ul>
+<p>The <code>equals</code> and <code>hashCode</code> methods on slides 55–56 aren't about threads. <code>ArrayList.contains</code> and <code>indexOf</code> use <code>equals</code> to find a book by title. (Slide 55's <code>if(!(p instanceof Book)</code> is missing a <code>)</code>; see the <a href="../reference/course-map.html#errata">errata</a>.)</p>
+<span class="sidenote">Oracle's rules for immutable objects are the same list, plus one more: if a field refers to a mutable object (an array, say), never hand that object out. <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/imstrat.html">A Strategy for Defining Immutable Objects</a></span>
+
+<h2>4 · Option B: copy in, copy out</h2>
+<p class="slides">Deck 3 · slides 57–61</p>
+
+<p>If books must be editable, slide 57's <code>Book</code> synchronizes its own <code>title()</code> and <code>set()</code>. Then the library stops handing out its internal objects:</p>
+<ul>
+<li><code>add</code> stores a <strong>copy</strong> of the book it was given (slide 58), so the caller's object isn't the one inside.</li>
+<li><code>get</code> returns a <strong>copy</strong> (slide 59), so the caller can't reach the stored one.</li>
+<li>Editing happens through the library's own <code>synchronized editBk</code> (slide 60), inside its lock.</li>
+</ul>
+<p>This is called <strong>defensive copying</strong>. Outside code never gets a reference to the library's data, so the library's lock covers every change.</p>
+
+<h2>5 · Coarse or fine</h2>
+<p class="slides">Deck 3 · slides 62–66</p>
+
+<p>Slide 62 names the trade-off:</p>
+<div class="table-wrap"><table>
+<tr><th></th><th>Coarse-grained (s63)</th><th>Fine-grained (s64–66)</th></tr>
+<tr><td>Locks</td><td>One: synchronized methods lock the whole object</td><td>One per element: <code>locks[j]</code></td></tr>
+<tr><td>Concurrency</td><td>One thread at a time, even on different elements</td><td>Threads on different elements run together</td></tr>
+<tr><td>Risk</td><td>Simple, hard to get wrong</td><td>More code; an action needing two locks can deadlock (lesson 11)</td></tr>
+</table></div>
+
+<pre>public void inc(int j, int x) {
+    synchronized (locks[j]) {   // only element j
+        data[j] = data[j] + x;
+    }
+}</pre>
+
+<p>With 8 threads updating random elements of a 1,000-element array, the coarse version took about 1.4 s on my machine and the fine version about 0.2 s, with identical totals.</p>
+
+<h2>6 · Dangers when sharing</h2>
+<p class="slides">Deck 3 · slide 67</p>
+
+<p>Slide 67 is a checklist for the exam and the assignment:</p>
+<ul>
+<li><strong>Leaking references</strong> to internal data (sections 2–4).</li>
+<li><strong>Inconsistent use of <code>synchronized</code></strong>: one unlocked method breaks the protection (lesson 8).</li>
+<li><strong>Mixing static and instance data</strong>: two different locks (lesson 9).</li>
+<li><strong>Traversing</strong> a list while another thread changes it. The slides give no detail; the safe default is to hold the lock for the whole traversal.</li>
+</ul>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">Every <code>Library</code> method is synchronized, but <code>get</code> returns the stored mutable <code>Book</code>. What's wrong?</p>
+<div class="options">
+<button class="opt" data-correct>callers change it outside the lock</button>
+<button class="opt">nothing, the methods are locked</button>
+<button class="opt">get() will deadlock with add()</button>
+<button class="opt">the ArrayList is not thread-safe</button>
+</div>
+<p class="why">The lock only covers code inside the library's methods. Once a caller holds the internal <code>Book</code>, it can change it at any time with no lock. That's a leaked reference.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Why can many threads read an immutable <code>Book</code> without any lock?</p>
+<div class="options">
+<button class="opt" data-correct>it can never change after creation</button>
+<button class="opt">final classes are locked by Java</button>
+<button class="opt">Strings are always synchronized</button>
+<button class="opt">its methods are all public</button>
+</div>
+<p class="why">Races need someone writing. An immutable object is only written in its constructor, so after that every thread just reads the same value.</p>
+</div>
+
+<div class="quiz">
+<p class="q">What is the main cost of fine-grained locking?</p>
+<div class="options">
+<button class="opt" data-correct>more complex, deadlock risk</button>
+<button class="opt">less concurrency than coarse</button>
+<button class="opt">it gives wrong totals</button>
+<button class="opt">it makes reads unsafe</button>
+</div>
+<p class="why">Fine-grained locking gives <em>more</em> concurrency. The price is more locks to manage, and an operation that needs two of them (such as swapping two elements) can deadlock. That's lesson 11.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Slide 59's <code>get</code> returns <code>new Book(b.title())</code> rather than <code>b</code>. Why?</p>
+<div class="options">
+<button class="opt" data-correct>so callers never hold internal data</button>
+<button class="opt">because Book has no public fields</button>
+<button class="opt">to make the method run faster</button>
+<button class="opt">because b is null outside the lock</button>
+</div>
+<p class="why">Defensive copying: the caller gets its own <code>Book</code>, and changing it doesn't affect the library. All changes to stored books go through the library's synchronized <code>editBk</code>.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0010/FineLocks.java"><code>lessons/code/0010/FineLocks.java</code></a>. <code>CoarseArray</code> is slide 63, complete. <code>FineArray</code> already builds its lock array (slide 64). Fill in its two methods, then run:</p>
+<pre class="language-bash">cd lessons/code/0010
+java FineLocks.java</pre>
+<p>Each update is deliberately slow, like real work. <code>PASS</code> needs the right total <em>and</em> a fine version at least twice as fast as the coarse one, so locking the whole array fails.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>Copy the line from <code>CoarseArray.inc</code> and wrap it in <code>synchronized (locks[j]) { … }</code> (slide 65). <code>get</code> is the same shape around <code>return data[j];</code> (slide 66).</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Leave out the lock in <code>inc</code> entirely. Is it faster? Is the total right? (b) Use <code>synchronized (this)</code> instead of <code>locks[j]</code>. What does the program say, and why?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>void inc(int j, int x) {
+    synchronized (locks[j]) {
+        data[j] = Slow.add(data[j], x);
+    }
+}
+
+int get(int j) {
+    synchronized (locks[j]) { return data[j]; }
+}</pre>
+<p>(a) A little faster, but my runs lost about 450 of 80,000 updates: two threads hit the same element at the same moment. (b) <code>this</code> is one lock for the whole array, which is coarse-grained again, so the program reports it isn't faster.</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Compare coarse-grained and fine-grained locking, with an example of each. (4 marks)</summary>
+<p>Coarse-grained: one lock protects the whole data structure, e.g. a shared array whose methods are all <code>synchronized</code>. It is simple and safe, but only one thread can use the structure at a time, even when threads access different elements, so it inhibits concurrency. Fine-grained: separate locks protect separate parts, e.g. an array of lock objects with <code>synchronized(locks[j])</code> around each access to element <code>j</code>. Threads using different elements proceed in parallel, giving more concurrency, at the cost of more complexity and the risk of deadlock when an operation needs several locks.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> Oracle's <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/immutable.html">Immutable Objects</a> and <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/imstrat.html">A Strategy for Defining Immutable Objects</a>. About 6 minutes. Then reread <strong>Deck 3, slides 50–61</strong>; the library code should now read as three attempts at the same problem.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Three ways a shared object can be safe (slide 50).</summary><p>Properly encapsulated with no leaked references, and either thread-safe (its own locking) or immutable.</p></details>
+<details class="recall"><summary>The recipe for an immutable class.</summary><p><code>final</code> class, <code>private final</code> fields set in the constructor, no setters, and never hand out mutable internals.</p></details>
+<details class="recall"><summary>Which lock does a <code>synchronized static</code> method take? (lesson 9)</summary><p>The class object, e.g. <code>Counter.class</code>.</p></details>
+
+<div class="next"><a href="0009-visibility-and-locks.html">← Lesson 9: visibility and locks</a><a href="0011-deadlock-and-lock.html">Lesson 11: deadlock and Lock →</a></div>
+
+<footer class="ask">Want the library example (slides 51–61) as runnable code, or a class to check for leaks yourself? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

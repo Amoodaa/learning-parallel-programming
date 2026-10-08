@@ -5,8 +5,8 @@ Pass the module well: the Java and C assignments (50%) and the theory + coding e
 
 ## Success looks like
 - Can read any slide in `source-materials/` and explain what it is for and how it connects to the slides around it.
-- Can write, from scratch, Java code that splits work across threads (split → start → join → combine), with a thread pool, and with Fork/Join.
-- Can answer exam theory questions: concurrent vs parallel, critical-section conditions, deadlock conditions and strategies, why more threads can be slower.
+- Can write, from scratch, Java code that splits work across threads (split → start → join → combine), with a thread pool, and with Fork/Join, and make shared data thread-safe with `synchronized`, `volatile` and `ReentrantLock` without deadlocking.
+- Can answer exam theory questions: concurrent vs parallel, critical-section conditions, deadlock conditions and strategies, why more threads can be slower, atomicity vs visibility, coarse vs fine-grained locking.
 - Can spot the bugs in slide code (see the errata in reference/course-map.html).
 
 ## Constraints

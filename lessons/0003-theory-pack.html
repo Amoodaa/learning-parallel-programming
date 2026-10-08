@@ -10,7 +10,7 @@
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 3 of 7 · <a href="../reference/theory.html">Theory sheet</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 3 of 11 · <a href="../reference/theory.html">Theory sheet</a> · <a href="../reference/glossary.html">Glossary</a></nav>
 
 <h1>Theory Pack</h1>
 <p class="subtitle">The exam-theory slides from Lecture 1, in one place.</p>
@@ -62,7 +62,7 @@
 
 <p>Slide 31's bullet “What is atomic and what is not?” refers to exactly this: <code>count++</code> looks like one step, but it's really three (read, add 1, write back). Two threads can both read the same old value and each write back the same +1, so one of the increments is lost. Run the demo to see it:</p>
 <pre class="language-bash">java lessons/code/0003/Race.java</pre>
-<p>Two threads each add 1 a million times. On my machine it printed about 1.1 million instead of 2 million, and a different number every run. <a href="code/0003/Race.java">Race.java</a> is a demonstration only; the fix (locks) is a later lecture.</p>
+<p>Two threads each add 1 a million times. On my machine it printed about 1.1 million instead of 2 million, and a different number every run. <a href="code/0003/Race.java">Race.java</a> is a demonstration only; the fix (<code>synchronized</code>) is <a href="0008-synchronized.html">lesson 8</a>.</p>
 
 <h2>4 · Deadlock</h2>
 <p class="slides">Deck 1 · slides 28–30</p>

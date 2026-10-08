@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synchronized</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 8 of 11 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Synchronized</h1>
+<p class="subtitle">Lock shared data so only one thread at a time can use it, and fix lesson 3's lost updates.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll make a counter and a pair of fields thread-safe, and watch a count that came out as 770,737 come out as exactly 1. About 25 minutes.</p>
+
+<p>This is the first lesson from Deck 3, <em>Sharing Resources</em>. Decks 1 and 2 gave each thread its own data. Deck 3 is about threads that <strong>must</strong> share, like lesson 3's <code>Race.java</code>, which lost about half its updates.</p>
+
+<h2>1 · Interference</h2>
+<p class="slides">Deck 3 · slides 2–4</p>
+
+<p>Slides 3–4 start two <code>Messenger</code> threads printing to the same screen, and slide 2 warns the output will be unreadable. On Java 26 each <code>println</code> line came out whole, but lines from the two threads were mixed together. Printing a line in two parts gave lines like <code>She loves me Happy days she loves me not</code>. The screen is shared, just like a variable.</p>
+
+<h2>2 · <code>synchronized</code> blocks</h2>
+<p class="slides">Deck 3 · slides 5–12</p>
+
+<pre>synchronized (lock) {
+    // only one thread at a time, per lock object
+}</pre>
+
+<p>Any object can be a <strong>lock</strong>. A thread must take the lock to enter the block, and it releases the lock when it leaves. A second thread that wants the <em>same</em> lock waits at the door (lesson 2's <code>BLOCKED</code> state). This is lesson 3's <strong>mutual exclusion</strong>: the block is a critical section.</p>
+
+<p>Slides 6–7 pass one <code>Object lock = new Object()</code> to both Messengers, so each prints all its lines before the other starts. Slides 9–11 share one lock between two <code>Summer</code>s and an <code>Editor</code>, so no sum is taken mid-edit. Slide 12 locks the array itself: <code>synchronized (data)</code>.</p>
+
+<div class="callout warn">
+<p><strong>A lock only works if everyone uses it</strong> (slide 8). In slide 6, <code>main</code> prints “Hello from main” with no lock, so its output can still appear in the middle of a Messenger's lines. And never <code>sleep</code> while holding a lock: everyone waiting for it sleeps too.</p>
+</div>
+
+<h2>3 · Why <code>x = x + 1</code> loses updates</h2>
+<p class="slides">Deck 3 · slides 13–19</p>
+
+<p>Java guarantees that a single read or a single write of an <code>int</code>, <code>boolean</code>, <code>char</code> or reference is <strong>atomic</strong>: it can't be seen half-done (slide 13). But <code>x = x + 1</code> is three steps (slide 17):</p>
+<pre class="language-plaintext">load x into a register
+add 1 to the register
+store the register back into x</pre>
+
+<p>Slide 18 interleaves two threads: both load <code>x = 1</code>, one stores 2, the other stores 0, and an update is lost. That's lesson 3's <code>Race.java</code> exactly.</p>
+<span class="sidenote">Slide 13 says <code>long</code> and <code>double</code> take two reads and two writes. The Java spec says this only for non-<code>volatile</code> ones; reads and writes of <code>volatile long</code> and <code>volatile double</code> are atomic. <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.7">JLS §17.7</a></span>
+
+<p>Slide 19's fix puts each call inside <code>synchronized (c) { c.inc(); }</code>. It works, but every caller has to remember to do it.</p>
+
+<h2>4 · <code>synchronized</code> methods</h2>
+<p class="slides">Deck 3 · slides 20–24</p>
+
+<p>Better: make the class protect itself (slide 20). A <code>synchronized</code> method is shorthand for locking <code>this</code> around the whole body (slide 21):</p>
+<pre>synchronized void inc() { x = x + 1; }
+// means the same as
+void inc() { synchronized (this) { x = x + 1; } }</pre>
+
+<p>Slide 22's <code>Counter</code> marks <code>inc</code>, <code>dec</code> and <code>get</code> all <code>synchronized</code>. Now every caller is safe without doing anything. The rules (slides 23–24):</p>
+<ul>
+<li>Two threads calling synchronized methods on the <strong>same object</strong> take turns, even if they call different methods.</li>
+<li>A synchronized method and a <strong>non</strong>-synchronized method on the same object <strong>can</strong> run at the same time, and may interfere. One unlocked method breaks the protection.</li>
+</ul>
+
+<h2>5 · What must be atomic</h2>
+<p class="slides">Deck 3 · slides 25–29</p>
+
+<p>Slides 25–26's joint bank account shows why the lock must cover the whole action, not single lines:</p>
+<pre>synchronized boolean withdraw(double amt) {
+    if (balance &gt;= amt) {        // check...
+        balance = balance - amt; // ...then act
+        return true;
+    }
+    return false;
+}</pre>
+<p>Without the lock, two people could both pass the check with £50 in the account and both take £50. Slide 27 names two things that must be atomic:</p>
+<ul>
+<li><strong>Compound actions</strong> such as check-then-act and read-modify-write.</li>
+<li><strong>Class invariants</strong>: rules that must always hold between fields. If <code>x == y</code> must always be true, then <code>x = x + a; y = y + a;</code> must happen as one step (slide 28), or another thread can see <code>x</code> updated and <code>y</code> not yet. Slide 29: an array and its count <code>n</code> are the same kind of pair.</li>
+</ul>
+<p>Also from slide 27: do slow computations <strong>outside</strong> the lock where you can, so other threads wait less.</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">Two threads each run <code>x = x + 1</code> once on a shared <code>x = 1</code>, with no lock. What can <code>x</code> end up as?</p>
+<div class="options">
+<button class="opt" data-correct>2 or 3</button>
+<button class="opt">always 3</button>
+<button class="opt">1, 2 or 3</button>
+<button class="opt">always 2</button>
+</div>
+<p class="why">Each thread loads, adds and stores. If both load 1 before either stores, both store 2 and one update is lost. Otherwise you get 3. It can't drop to 1, because each store writes a value one higher than something read.</p>
+</div>
+
+<div class="quiz">
+<p class="q">A class has <code>synchronized void inc()</code> and a plain <code>void reset()</code>. Thread A calls <code>inc</code> while B calls <code>reset</code> on the same object. What happens?</p>
+<div class="options">
+<button class="opt" data-correct>both may run at the same time</button>
+<button class="opt">reset waits until inc is done</button>
+<button class="opt">inc waits until reset is done</button>
+<button class="opt">Java refuses to compile it</button>
+</div>
+<p class="why">Slide 24: only synchronized methods take the lock, so <code>reset</code> never waits for it. Every method that touches the shared fields has to be synchronized.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Two Messengers use <code>synchronized (new Object()) { … }</code> inside <code>run()</code>. Does it stop their output mixing?</p>
+<div class="options">
+<button class="opt" data-correct>no, each locks its own object</button>
+<button class="opt">yes, any synchronized block works</button>
+<button class="opt">yes, but only for println calls</button>
+<button class="opt">no, run() cannot be synchronized</button>
+</div>
+<p class="why">Threads only exclude each other when they lock the <em>same</em> object. That's why slide 6 creates one lock in <code>main</code> and passes it to both threads.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Which of these is <em>not</em> on slide 27's list of locking advice?</p>
+<div class="options">
+<button class="opt" data-correct>lock every method in the program</button>
+<button class="opt">never sleep while holding a lock</button>
+<button class="opt">compute costly things outside it</button>
+<button class="opt">keep class invariants atomic</button>
+</div>
+<p class="why">Lock what is shared, and only for as long as needed. Locking everything makes threads queue up for no reason. Lesson 10 covers how coarse or fine locks should be.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0008/SafeCounter.java"><code>lessons/code/0008/SafeCounter.java</code></a>. It has slide 15's unsafe <code>Counter</code> and slide 28's <code>Pair</code>, whose fields must always be equal. Fill in the two <code>TODO</code>s, then run:</p>
+<pre class="language-bash">cd lessons/code/0008
+java SafeCounter.java</pre>
+<p>Run it unchanged first. My three runs printed counters of 770,737, 849,462 and −22,596, and saw <code>x != y</code> hundreds of times. Your goal is <code>PASS</code>.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>TODO 1 is one keyword added to each of three methods (slide 22). TODO 2: wrap both lines in one <code>synchronized (this) { … }</code> block. <code>consistent()</code> is already synchronized, which locks the same object.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Synchronize <code>inc</code> and <code>dec</code> but not <code>get</code>. Does the counter still come out right here? Why is it still wrong in general? (b) Put each of <code>x</code>'s and <code>y</code>'s updates in its own <code>synchronized (this)</code> block. Does part 2 pass?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>synchronized void inc() { x = x + 1; }   // TODO 1
+synchronized void dec() { x = x - 1; }
+synchronized int get()  { return x; }
+
+synchronized (this) {                    // TODO 2
+    x = x + 1;
+    y = y + 1;
+}</pre>
+<p>(a) Here, yes: <code>get</code> runs only after both <code>join</code>s. But a thread calling <code>get</code> during the updates has no visibility guarantee (lesson 9). (b) No. Between the two blocks the lock is free, and the checker can see <code>x</code> one ahead of <code>y</code>. The invariant needs both updates in one locked step.</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Explain why <code>count++</code> on a shared variable is not thread-safe, and show how to make a counter class thread-safe in Java. (5 marks)</summary>
+<p><code>count++</code> is a read-modify-write: load the value, add one, store it back. It is not atomic, so two threads can both load the same value and both store value + 1, losing one update (a race condition). Fix: make the class use its intrinsic lock by declaring every method that accesses the field <code>synchronized</code> (<code>inc</code>, <code>dec</code> and <code>get</code>). Only one thread at a time can then run a synchronized method on that object, so each increment completes before another begins. All accessing methods must be synchronized, because a non-synchronized method does not take the lock and can still interfere.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> Oracle's Java Tutorial, three short pages: <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/interfere.html">Thread Interference</a> → <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/syncmeth.html">Synchronized Methods</a> → <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/locksync.html">Intrinsic Locks and Synchronization</a>. About 10 minutes, and the first page is slide 17 with more explanation.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>What does a <code>synchronized</code> method lock?</summary><p><code>this</code>, the object the method is called on. It's the same as wrapping the body in <code>synchronized (this) { … }</code>.</p></details>
+<details class="recall"><summary>Name two kinds of action that must be atomic.</summary><p>Compound actions (check-then-act, read-modify-write) and class invariants (fields that must stay consistent with each other).</p></details>
+<details class="recall"><summary>Name the four critical-section rules. (lesson 3)</summary><p>No two inside at once; no assumptions about speed or number of CPUs; nobody outside may block others; nobody waits forever.</p></details>
+
+<div class="next"><a href="0007-fork-join.html">← Lesson 7: Fork/Join</a><a href="0009-visibility-and-locks.html">Lesson 9: visibility and locks →</a></div>
+
+<footer class="ask">Want slides 9–12's Summer and Editor made runnable, or another thread-safety bug to find? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

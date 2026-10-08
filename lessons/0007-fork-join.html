@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fork/Join</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 7 of 11 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Fork/Join</h1>
+<p class="subtitle">A task that splits itself in half until it is small, run by a pool whose idle threads steal work.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll write the five lines that make a task split itself, and count lesson 6's primes twice as fast on 2 threads, without choosing any piece sizes. About 25 minutes.</p>
+
+<p>Deck 2 slides 79–99 finish the deck's story. Lesson 6 ended with a question the slides never answered: how small should the pieces be? Fork/Join's answer is to stop choosing. Each task splits itself until it is small, and the pool shares the pieces out.</p>
+
+<h2>1 · Divide and conquer</h2>
+<p class="slides">Deck 2 · slides 79–81</p>
+
+<p>Slide 80 is the whole idea, written as pseudocode:</p>
+<pre class="language-plaintext">solve(problem):
+    if problem is small: solve it directly
+    else:
+        split it into independent parts
+        fork a subtask for each part
+        join all the subtasks
+        combine their results</pre>
+
+<p>It's lesson 1's pattern (split, start, join, combine), but <strong>recursive</strong>: each half is split again, and again, until the pieces are small. A job of 10 million numbers with a base size of 1,000 is halved 14 times, into about 16,000 tasks of about 600 numbers each.</p>
+
+<h2>2 · Work stealing</h2>
+<p class="slides">Deck 2 · slides 82–83</p>
+
+<p>The tasks run in a <code>ForkJoinPool</code>. It differs from lesson 5's pool in one way that matters (slide 82):</p>
+<ul>
+<li>Each thread has <strong>its own queue</strong>. When a task forks subtasks, they go on that thread's queue.</li>
+<li>A thread whose queue is empty <strong>steals</strong> a task from another thread's queue.</li>
+</ul>
+<p>So with uneven work, the thread that got the cheap half of the primes runs out, steals part of the expensive half, and nobody sits idle. This is lesson 6's small-pieces fix, done automatically.</p>
+
+<p><code>new ForkJoinPool()</code> makes one thread per processor (slide 83). You can pass a number to choose: <code>new ForkJoinPool(2)</code>.</p>
+<span class="sidenote">Javadoc: the no-argument constructor “Creates a ForkJoinPool with parallelism equal to Runtime.availableProcessors()”. <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ForkJoinPool.html">ForkJoinPool</a></span>
+
+<h2>3 · The task classes</h2>
+<p class="slides">Deck 2 · slides 84–91</p>
+
+<p>You write a class that extends one of two types and override <code>compute()</code> (slide 84):</p>
+<ul>
+<li><code>RecursiveTask&lt;V&gt;</code>: <code>compute()</code> returns a <code>V</code>. Like lesson 5's <code>Callable</code>.</li>
+<li><code>RecursiveAction</code>: <code>compute()</code> returns nothing. Like <code>Runnable</code>. (Slide 84 writes <code>RecursiveAction&lt;V&gt;</code>, but it takes no type parameter; see the <a href="../reference/course-map.html#errata">errata</a>.)</li>
+</ul>
+
+<p>Slides 88–90's sum, shortened:</p>
+<pre>class Sum extends RecursiveTask&lt;Long&gt; {
+    static final int BaseBlockSize = 5000;
+    // fields data, lb, ub and a constructor
+    protected Long compute() {
+        if (ub - lb &lt;= BaseBlockSize) {
+            long sum = 0;   // small: a plain loop
+            for (int i = lb; i &lt; ub; ++i) sum += data[i];
+            return sum;
+        }
+        int mid = lb + (ub - lb) / 2;
+        Sum left  = new Sum(data, lb, mid);
+        Sum right = new Sum(data, mid, ub);
+        left.fork();          // queue both halves
+        right.fork();
+        long rSum = right.join();  // wait, take result
+        long lSum = left.join();
+        return lSum + rSum;
+    }
+}</pre>
+
+<p>Here <code>fork()</code> is like <code>submit</code>: it queues the task and returns at once. <code>join()</code> is like <code>future.get()</code>: it waits and returns the result. Note that this is <code>ForkJoinTask.join()</code>, not <code>Thread.join()</code>; the name is reused. <code>protected</code> just means subclasses can see the method; copy it as written.</p>
+
+<p>Slide 91 starts it with one call that waits for the whole tree and returns the top task's result:</p>
+<pre>ForkJoinPool fjPool = new ForkJoinPool();
+long sum = fjPool.invoke(new Sum(f, 0, f.length));</pre>
+<span class="sidenote"><code>mid = lb + (ub - lb) / 2</code> rather than <code>(lb + ub) / 2</code>: the second form can overflow <code>int</code> for huge arrays, the same trap as lesson 4's <code>j * N</code>.</span>
+
+<h2>4 · Never do this</h2>
+<p class="slides">Deck 2 · slide 87</p>
+
+<pre>left.fork();
+long lSum = left.join();   // waits for left first...
+right.fork();              // ...so right starts late
+long rSum = right.join();</pre>
+
+<p>Joining <code>left</code> before forking <code>right</code> makes the halves run one after the other, at every level of the recursion. It's the same mistake as <code>start(); join();</code> in one loop (lesson 1). I timed it with the exercise below: 2.83 s, exactly as slow as no threads at all (2.81 s). The correct order took 1.41 s.</p>
+
+<h2>5 · Quicksort</h2>
+<p class="slides">Deck 2 · slides 92–99</p>
+
+<p>Slides 92–95 are the ordinary quicksort: rearrange a segment into a left part and a right part, then sort each part. You don't need the partition details for this module's parallel part. What matters is that the two parts are independent, so they can run as parallel subtasks (slide 96). Sorting returns nothing, so <code>QuickSort</code> extends <code>RecursiveAction</code> (slides 97–98):</p>
+<pre>QuickSort left  = new QuickSort(data, lb, i);
+QuickSort right = new QuickSort(data, j, ub);
+invokeAll(left, right);   // fork both, wait for both</pre>
+<p><code>invokeAll</code> does the fork-both-then-join-both pattern in one call, so slide 98's extra <code>left.join(); right.join();</code> afterwards is harmless but unnecessary. Slide 99: 10 million numbers in about 2.9 s on a dual-core machine.</p>
+<span class="sidenote">Javadoc for <code>invokeAll(t1, t2)</code>: “Forks the given tasks, returning when isDone holds for each task”. <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ForkJoinTask.html">ForkJoinTask</a></span>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">In a <code>ForkJoinPool</code>, what does a thread do when its own queue is empty?</p>
+<div class="options">
+<button class="opt" data-correct>steals another thread's task</button>
+<button class="opt">waits until all threads finish</button>
+<button class="opt">creates a new thread to help</button>
+<button class="opt">ends, and the pool shrinks</button>
+</div>
+<p class="why">Work stealing (slide 82): an idle thread takes a task from another thread's queue. That's how Fork/Join keeps every core busy even when the work is uneven.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Which order of calls runs both halves <em>in parallel</em>?</p>
+<div class="options">
+<button class="opt" data-correct>l.fork; r.fork; r.join; l.join</button>
+<button class="opt">l.fork; l.join; r.fork; r.join</button>
+<button class="opt">l.join; r.join; l.fork; r.fork</button>
+<button class="opt">l.fork; l.join; r.compute</button>
+</div>
+<p class="why">Fork both before joining either. Joining <code>left</code> before <code>right</code> exists in the queue is slide 87's “never do this”: the halves run one after the other.</p>
+</div>
+
+<div class="quiz">
+<p class="q">A Fork/Join task sorts an array in place and returns nothing. What does it extend?</p>
+<div class="options">
+<button class="opt" data-correct><code>RecursiveAction</code></button>
+<button class="opt"><code>RecursiveTask&lt;Void&gt;</code></button>
+<button class="opt"><code>RecursiveAction&lt;int[]&gt;</code></button>
+<button class="opt"><code>Callable&lt;int[]&gt;</code></button>
+</div>
+<p class="why"><code>RecursiveAction</code>'s <code>compute()</code> is <code>void</code>, like slide 97's <code>QuickSort</code>. It takes no type parameter, whatever slide 84 says.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Compared with lesson 6's fixed pool of 1,000-number pieces, what does Fork/Join remove?</p>
+<div class="options">
+<button class="opt" data-correct>choosing the pieces up front</button>
+<button class="opt">the need for any pool at all</button>
+<button class="opt">the base case's plain loop</button>
+<button class="opt">combining the partial results</button>
+</div>
+<p class="why">You still need a pool, a small-enough base case and a combine step. What's gone is cutting the job up yourself: tasks split themselves, and stealing balances the load. In the exercise, both approaches took about 1.4 s on 2 threads.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0007/ForkPrimes.java"><code>lessons/code/0007/ForkPrimes.java</code></a>. <code>CountPrimes</code> is lesson 6's prime counter as a <code>RecursiveTask&lt;Integer&gt;</code>, with the base case written. Fill in the <code>TODO</code>, the recursive case, then run:</p>
+<pre class="language-bash">cd lessons/code/0007
+java ForkPrimes.java</pre>
+<p>It counts once without threads and once with Fork/Join on 2 threads, about 5 seconds in all. <code>PASS</code> needs the right count <em>and</em> a real speed-up, so slide 87's order fails.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>Copy the shape of slide 90: compute <code>mid</code>, make a <code>left</code> and <code>right</code> <code>CountPrimes</code>, fork both, join both, return the sum.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Use slide 87's order. What speed-up do you get? (b) Set <code>BaseBlockSize</code> to 5,000,000. How many tasks run, and which lesson 6 time do you get back?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>int mid = lb + (ub - lb) / 2;
+CountPrimes left  = new CountPrimes(lb, mid);
+CountPrimes right = new CountPrimes(mid, ub);
+left.fork();
+right.fork();
+int r = right.join();
+int l = left.join();
+return l + r;</pre>
+<p>(a) About 1.0×: no faster than one thread. (b) Only two base tasks (the halves of 10M), so one thread gets the cheap half and idles. On my machine that took 1.75 s, the same as lesson 6's two big pieces.</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Describe the Fork/Join framework and explain how work stealing improves on a pool with a fixed division of work. (6 marks)</summary>
+<p>A Fork/Join task solves a problem directly if it is small (below a threshold); otherwise it splits it into independent subtasks, forks them, joins them and combines their results, recursively. Tasks extend <code>RecursiveTask&lt;V&gt;</code> (returns a value) or <code>RecursiveAction</code> (no value) and override <code>compute()</code>. They run in a <code>ForkJoinPool</code>, by default one thread per processor. Each thread keeps its own queue of forked tasks; when its queue is empty it steals a task from another thread's queue. With a fixed division, a thread that gets less work finishes early and idles; with stealing it takes over part of a busy thread's work, so the load balances automatically without choosing piece sizes in advance. All subtasks must be forked before any is joined, or the parts run sequentially.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> Oracle's <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/forkjoin.html">Fork/Join</a> tutorial page (5 minutes). Its pseudocode is the same as slide 80. Then reread <strong>Deck 2, slides 79–91</strong>. Deck 2 is now complete.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Write the recursive case of a <code>RecursiveTask</code> that sums <code>[lb, ub)</code>.</summary><p>mid = lb + (ub − lb)/2; make left and right; <code>left.fork(); right.fork();</code> return <code>right.join() + left.join()</code>.</p></details>
+<details class="recall"><summary>What is work stealing?</summary><p>Each pool thread has its own task queue; a thread with an empty queue takes tasks from another thread's queue.</p></details>
+<details class="recall"><summary>Why did equal pieces give only 33% gain for primes? (lesson 6)</summary><p>Large numbers cost more to test, so the thread with the small numbers finished early and sat idle.</p></details>
+
+<div class="next"><a href="0006-uneven-work.html">← Lesson 6: uneven work</a><a href="0008-synchronized.html">Lesson 8: synchronized →</a></div>
+
+<footer class="ask">Want the full quicksort from slides 93–98 made runnable, or a different Fork/Join problem to practise? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

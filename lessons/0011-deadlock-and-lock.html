@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deadlock and Lock</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 11 of 11 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Deadlock and Lock</h1>
+<p class="subtitle">When an action needs two locks, take them in a fixed order. Then meet <code>ReentrantLock</code>, the explicit version of <code>synchronized</code>.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll take a shuffle program that deadlocks every time and make it finish, by changing how two locks are chosen. About 20 minutes.</p>
+
+<p>Deck 3 slides 68–91 bring back lesson 3's deadlock theory, this time in real code. Lesson 10's fine-grained locks are fast, but a swap needs <strong>two</strong> of them, and two locks can deadlock. The slides fix it twice, first with lock ordering and then with <code>tryLock</code>. Slides 92–101 are practice; this lesson ends with them.</p>
+
+<h2>1 · Deadlock, now in code</h2>
+<p class="slides">Deck 3 · slides 68–75</p>
+
+<p>Slides 68–69 repeat lesson 3: two threads are deadlocked if each holds a resource the other is waiting for, and it needs all four Coffman conditions. Slide 70's prevention is <strong>resource ordering</strong>: every thread requests resources in the same fixed order, which makes a circular wait impossible.</p>
+
+<p>Slides 71–75 apply it. Several threads shuffle an array by swapping random pairs. A swap must be atomic, and with one lock per element (lesson 10) it needs both elements' locks:</p>
+<pre>// thread A: swap(3, 7)      thread B: swap(7, 3)
+synchronized (locks[3]) {    synchronized (locks[7]) {
+  synchronized (locks[7]) {    synchronized (locks[3]) {</pre>
+<p>A holds 3 and waits for 7; B holds 7 and waits for 3. That's a circular wait, and neither will ever move. Slide 74's fix is to always pick <code>left &lt; right</code> and lock <code>left</code> first. Then both threads try lock 3 first, one of them waits <em>before</em> holding anything, and no cycle can form.</p>
+<span class="sidenote">I ran 4 threads doing 200,000 random swaps each on a 10-element array. Locking in the caller's order deadlocked within 5 seconds in 3 runs out of 3. Locking the lower index first finished every time in under a second.</span>
+
+<h2>2 · Starvation and livelock</h2>
+<p class="slides">Deck 3 · slide 76</p>
+
+<p>Slide 76 only has the two words, so here are the definitions:</p>
+<ul>
+<li><strong>Starvation</strong>: a thread can never get the resource it needs, because others keep taking it. The other threads still make progress (lesson 3).</li>
+<li><strong>Livelock</strong>: threads aren't blocked, but they keep reacting to each other and none gets any work done. Think of two people in a corridor who both step aside the same way, again and again.</li>
+</ul>
+<span class="sidenote">The corridor example is Oracle's: livelocked threads “are not blocked — they are simply too busy responding to each other to resume work.” <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/starvelive.html">Starvation and Livelock</a></span>
+
+<h2>3 · The <code>Lock</code> interface</h2>
+<p class="slides">Deck 3 · slides 77–82</p>
+
+<p>A <code>Lock</code> is <code>synchronized</code> made explicit: you call <code>lock()</code> and <code>unlock()</code> yourself (slides 77–78). <code>ReentrantLock</code> gives the same guarantees as <code>synchronized</code>, atomicity and visibility, and like it is reentrant (slide 79). Slide 80's pattern is the one to memorise:</p>
+<pre>Lock lock = new ReentrantLock();
+lock.lock();
+try {
+    // the critical section
+} finally {
+    lock.unlock();   // runs even if an exception is thrown
+}</pre>
+<p>Why <code>finally</code>? <code>synchronized</code> releases its lock automatically when the block ends, even through an exception. A <code>Lock</code> doesn't: forget <code>unlock()</code> on one path and the lock is held forever. Slides 81–82 redo the shared screen this way. You need <code>import java.util.concurrent.locks.*;</code>.</p>
+
+<h2>4 · The theatre</h2>
+<p class="slides">Deck 3 · slides 83–87</p>
+
+<p>Slides 83–86 book seats. <code>getSeats()</code> lists the free seats and <code>bookSeat(k)</code> books one, each inside <code>lock()</code>/<code>finally unlock()</code>. Slide 83's key sentence: a seat may appear free and be booked by someone else before you book it. That's fine, because <code>bookSeat</code> <strong>checks again inside the lock</strong> (<code>if (seats[k])</code>) before taking it. It's lesson 8's check-then-act, done right.</p>
+
+<p><strong>Fairness</strong> (slide 87): by default, when a lock is released there's no rule about which waiting thread gets it next. <code>new ReentrantLock(true)</code> gives it to the longest-waiting thread, which prevents starvation but is slower.</p>
+<span class="sidenote">Javadoc: programs using fair locks “may display lower overall throughput (i.e., are slower; often much slower)”. <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html">ReentrantLock</a></span>
+
+<h2>5 · <code>tryLock</code>: don't wait</h2>
+<p class="slides">Deck 3 · slides 88–91</p>
+
+<p><code>tryLock()</code> takes the lock if it's free and returns <code>true</code>; otherwise it returns <code>false</code> immediately instead of waiting (slide 88). Slide 91 uses it for the shuffle:</p>
+<pre>locks[g].lock();
+try {
+    if (locks[h].tryLock()) {
+        try { /* swap */ } finally { locks[h].unlock(); }
+    }   // else: skip this swap
+} finally { locks[g].unlock(); }</pre>
+<p>A thread never <em>waits</em> while holding a lock. That breaks <strong>hold and wait</strong>, so no deadlock is possible, in any order. The price: some swaps are skipped and have to be tried again.</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">Always locking the lower index first prevents deadlock by breaking which condition?</p>
+<div class="options">
+<button class="opt" data-correct>circular wait</button>
+<button class="opt">mutual exclusion</button>
+<button class="opt">hold and wait</button>
+<button class="opt">no pre-emption</button>
+</div>
+<p class="why">With one global order, a thread can only ever wait for a higher-numbered lock than the ones it holds, so no cycle can form (slide 70). Slide 91's <code>tryLock</code> breaks hold and wait instead.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Why must <code>unlock()</code> go in a <code>finally</code> block?</p>
+<div class="options">
+<button class="opt" data-correct>so an exception can't leave it locked</button>
+<button class="opt">because unlock() throws exceptions</button>
+<button class="opt">so the lock is released before work</button>
+<button class="opt">Java won't compile it otherwise</button>
+</div>
+<p class="why">If the critical section throws and <code>unlock()</code> is skipped, the lock stays held and every other thread waits forever. <code>finally</code> runs however the <code>try</code> ends.</p>
+</div>
+
+<div class="quiz">
+<p class="q">The theatre's <code>getSeats()</code> showed seat 5 free. Why must <code>bookSeat(5)</code> still check <code>seats[5]</code>?</p>
+<div class="options">
+<button class="opt" data-correct>someone may have booked it since</button>
+<button class="opt">getSeats() might have a bug in it</button>
+<button class="opt">seats[] is not volatile</button>
+<button class="opt">the lock is not reentrant</button>
+</div>
+<p class="why">The lock was released between the two calls, so the list can be out of date. The check and the booking must happen together inside one lock (check-then-act).</p>
+</div>
+
+<div class="quiz">
+<p class="q">Threads are not blocked, but keep reacting to each other and make no progress. What is that?</p>
+<div class="options">
+<button class="opt" data-correct>livelock</button>
+<button class="opt">deadlock</button>
+<button class="opt">starvation</button>
+<button class="opt">a race condition</button>
+</div>
+<p class="why">Deadlocked threads are blocked. Livelocked threads are busy but get nowhere. A starving thread is stuck while the others progress.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0011/Shuffle.java"><code>lessons/code/0011/Shuffle.java</code></a>. <code>swap</code> already uses <code>ReentrantLock</code>s with slide 80's <code>try</code>/<code>finally</code> pattern, but it locks in the caller's order. Fix the <code>TODO</code>, then run:</p>
+<pre class="language-bash">cd lessons/code/0011
+java Shuffle.java</pre>
+<p>Unchanged, it deadlocks; the program notices after 5 seconds and reports it. Your goal is <code>PASS</code>: the threads finish, and the array still holds 0–9 exactly once each.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>Only the line that picks <code>first</code> and <code>second</code> needs changing. <code>first</code> should be the lock of the smaller index: <code>Math.min(g, h)</code>.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Remove all the locking and keep just the three swap lines. What does the array look like at the end? (b) Rewrite <code>swap</code> with slide 91's <code>tryLock</code> and no ordering. Does it pass?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>Lock first  = locks[Math.min(g, h)];
+Lock second = locks[Math.max(g, h)];</pre>
+<p>(a) In my runs every element ended up as the same number, e.g. all 0s: overlapping swaps copied values over each other. (b) Yes: no thread waits while holding a lock, so there's no deadlock, but some swaps are skipped.</p>
+</details>
+
+<h2>Deck 3's own exercises</h2>
+<p class="slides">Deck 3 · slides 92–101</p>
+<p>The deck ends with three programs and no questions. These are the questions they set up, with my answers.</p>
+<details class="recall"><summary>Slides 92–93: a <code>Summer</code> prints the array's sum while a <code>Swapper</code> swaps elements. Should the printed sum change? What's wrong with <code>stopSwap()</code>?</summary>
+<p>No: swapping doesn't change the sum, and both lock <code>data</code>, so a sum is never taken mid-swap. But <code>go</code> isn't <code>volatile</code> and isn't read under a lock, so <code>stopSwap()</code> may never be seen (lesson 9).</p></details>
+<details class="recall"><summary>Slides 94–97: <code>Counter</code>'s field is both <code>volatile</code> and accessed only through <code>synchronized</code> methods. Is <code>volatile</code> needed? Can main's readings go below 0?</summary>
+<p>Not needed: the lock already gives visibility. And no, <code>dec</code> only decrements when the count is above 0, and the check and decrement are one atomic step inside a synchronized method.</p></details>
+<details class="recall"><summary>Slides 98–101: visitors enter a garden through two turnstiles. Why are <code>t1</code>, <code>t2</code> and <code>leave</code> all synchronized, when they're different methods?</summary>
+<p>They all change the same <code>count</code>, and all synchronized methods of one object share one lock (lesson 8). If only <code>t1</code> were synchronized, a visitor entering through <code>t2</code> could race with it and lose a count.</p></details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Explain how resource ordering prevents deadlock when swapping array elements protected by an array of locks. (4 marks)</summary>
+<p>A swap needs the locks of both elements. If threads take them in arbitrary order, one thread can hold lock i and wait for j while another holds j and waits for i: a circular wait, so deadlock. With resource ordering, every thread always locks the lower index first, then the higher. A thread holding a lock can then only wait for a higher-numbered lock, so a cycle of waiting threads is impossible. This breaks Coffman's circular-wait condition, and since all four conditions are necessary, deadlock cannot occur.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> Oracle's <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Deadlock</a>, <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/starvelive.html">Starvation and Livelock</a> and <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/newlocks.html">Lock Objects</a> (which solves its deadlock with <code>tryLock</code>, like slide 91). About 10 minutes. That completes the three decks.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Write slide 80's lock pattern.</summary><pre>lock.lock();
+try { /* critical section */ }
+finally { lock.unlock(); }</pre></details>
+<details class="recall"><summary>Two ways the slides prevent deadlock in the shuffle, and which condition each breaks.</summary><p>Lock in a fixed order (circular wait); <code>tryLock</code> the second lock and give up if it's taken (hold and wait).</p></details>
+<details class="recall"><summary>Coarse vs fine-grained locking in one line each. (lesson 10)</summary><p>Coarse: one lock for everything; simple, less concurrency. Fine: a lock per part; more concurrency, more complexity and deadlock risk.</p></details>
+
+<div class="next"><a href="0010-thread-safe-classes.html">← Lesson 10: thread-safe classes</a><a href="../reference/course-map.html">Course map →</a></div>
+
+<footer class="ask">Want a runnable version of the theatre or garden, or a mixed revision quiz across all eleven lessons? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

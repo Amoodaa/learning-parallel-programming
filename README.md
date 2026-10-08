@@ -2,7 +2,7 @@
 
 Short HTML lessons, single-file Java exercises, and reference notes based on the lecture decks in `source-materials/`.
 
-Open `index.html` to start. The course map lists the seven planned lessons, detailed slide ranges, and slide corrections. Lessons 1–3 are available now.
+Open `index.html` to start. The course map lists the eleven lessons, detailed slide ranges, and slide corrections.
 
 ## GitHub Pages
 

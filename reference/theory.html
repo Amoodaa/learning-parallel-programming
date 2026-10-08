@@ -11,7 +11,7 @@
 <nav class="crumbs"><a href="course-map.html">Course map</a> · <a href="glossary.html">Glossary</a> · <a href="../lessons/0003-theory-pack.html">Lesson 3</a></nav>
 
 <h1>Theory Sheet</h1>
-<p class="subtitle">Lecture 1's exam theory on one page.</p>
+<p class="subtitle">The exam theory from all three decks on one page.</p>
 
 <h2>Concurrent vs parallel <span class="slides">D1 s8–10</span></h2>
 <div class="table-wrap"><table>
@@ -52,7 +52,22 @@
 <h2>History <span class="slides">D1 s32–33</span></h2>
 <p>1960s: CPU/device overlap · Dijkstra 1965: <em>Cooperating Sequential Processes</em>, semaphores, mutual exclusion, <code>parbegin … parend</code> · Hoare 1971 · monitors (Brinch Hansen &amp; Hoare 1973) · Concurrent Pascal 1975.</p>
 
-<p class="slides">Sources: Deck 1 slides as marked; <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf">OSTEP ch. 26</a>; <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf">OSTEP ch. 32</a>.</p>
+<h2>Splitting work <span class="slides">D2 s5, 14, 21–27, 77–82</span></h2>
+<p><strong>Threads = processors</strong> for CPU-bound work: extra threads add creation and scheduling cost without speed (rank sort with 100,000 threads was slower than none). Too little work per thread and start-up costs dominate. <strong>Fair split:</strong> boundaries <code>j*N/k</code>, pieces differ by at most 1. <strong>Uneven work:</strong> equal-sized pieces may not be equal work, so threads idle; fix with many small tasks in a pool. <strong>Fork/Join:</strong> recursive divide and conquer in a <code>ForkJoinPool</code>; <strong>work stealing</strong> lets idle threads take queued tasks from busy ones.</p>
+
+<h2>Atomicity and visibility <span class="slides">D3 s13–17, 30–36</span></h2>
+<p><strong>Atomicity:</strong> an action happens as one indivisible step. Single reads and writes of <code>int</code>, <code>boolean</code>, <code>char</code> and references are atomic; <code>x = x + 1</code> (load, add, store) is not. <strong>Visibility:</strong> without synchronization, there's no guarantee another thread ever sees a write (caching, reordering). A common lock gives both; <code>volatile</code> gives visibility only.</p>
+
+<h2>Safe sharing <span class="slides">D3 s27, 50, 62, 67</span></h2>
+<p><strong>Must be atomic:</strong> compound actions (check-then-act, read-modify-write) and class invariants. <strong>A shared class</strong> must be encapsulated, leak no references, and be thread-safe or immutable. <strong>Coarse-grained</strong> locking (one lock) is simple but inhibits concurrency; <strong>fine-grained</strong> (a lock per part) allows more but risks deadlock. <strong>Dangers:</strong> leaked references, inconsistent use of <code>synchronized</code>, mixing static and instance data, traversing shared structures.</p>
+
+<h2>Monitor <span class="slides">D3 s48</span></h2>
+<p>Data plus a lock giving one thread at a time exclusive access, plus a queue of threads waiting to enter. Java's synchronization is based on monitors.</p>
+
+<h2>Deadlock in practice <span class="slides">D3 s68–76, 87–91</span></h2>
+<p><strong>Resource ordering</strong> (always lock in one global order) breaks circular wait. <strong><code>tryLock</code></strong> (give up instead of waiting while holding a lock) breaks hold and wait. <strong>Livelock:</strong> threads aren't blocked but keep reacting to each other without progress. <strong>Fair lock:</strong> <code>new ReentrantLock(true)</code> serves the longest-waiting thread first, preventing starvation at a cost in speed.</p>
+
+<p class="slides">Sources: Deck 1 and Deck 3 slides as marked; <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf">OSTEP ch. 26</a>; <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf">OSTEP ch. 32</a>.</p>
 </main>
 </body>
 </html>

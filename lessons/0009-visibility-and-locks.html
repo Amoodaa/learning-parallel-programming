@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visibility and Locks</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 9 of 11 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Visibility and Locks</h1>
+<p class="subtitle">What a lock guarantees besides “one at a time”, which object each lock really is, and what a monitor is.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll fix two lock bugs taken straight from the slides: a static counter that loses updates, and a thread that won't stop. About 20 minutes.</p>
+
+<p>Deck 3 slides 30–49 jump between visibility, the egg timer, static methods, a stack and monitors. One question connects them: <strong>what exactly does a lock protect?</strong> Answering it in order explains each slide group.</p>
+
+<h2>1 · Visibility</h2>
+<p class="slides">Deck 3 · slides 30–32</p>
+
+<p>Lesson 8 was about <strong>atomicity</strong>: nobody sees an update half-done. This is a second, separate problem. Without synchronization there is <strong>no guarantee that one thread ever sees another thread's write</strong> (slide 30). Compilers and CPUs may reorder instructions, and each core may keep its own cached copy of a variable. Slide 31: without synchronization, you can't reason about the order in which memory changes happen.</p>
+
+<p>The lock fixes this too (slide 32). If T1 releases a lock and T2 then takes <strong>the same lock</strong>, T2 sees every change T1 made before releasing it.</p>
+<span class="sidenote">Java's spec calls this a <em>happens-before</em> relationship: “An unlock on a monitor happens-before every subsequent lock on that monitor.” <a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.4.5">JLS §17.4.5</a>. Oracle's tutorial page <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/memconsist.html">Memory Consistency Errors</a> explains it in plain words.</span>
+
+<h2>2 · The egg timer again</h2>
+<p class="slides">Deck 3 · slides 33–36</p>
+
+<p>Lesson 2 stopped a thread with <code>private volatile boolean go</code>. Slide 35 offers two solutions:</p>
+<pre>synchronized void terminate() { go = false; }  // (1)
+private volatile boolean go = true;            // (2)</pre>
+
+<div class="callout warn">
+<p><strong>(1) alone does not work.</strong> The lock only gives visibility to a thread that takes the same lock, and <code>run()</code>'s <code>while (go)</code> takes no lock. I tested it on Java 26 with a busy loop: the thread never stopped, 3 runs out of 3. It works only if the loop also reads <code>go</code> through a synchronized method. Slide 34's loop sleeps for a second each time round, which usually hides the bug but doesn't fix it.</p>
+</div>
+
+<p>Slide 36 is the sentence to learn for the exam:</p>
+<ul>
+<li>A lock gives <strong>atomicity and visibility</strong>.</li>
+<li><code>volatile</code> gives <strong>visibility only</strong>.</li>
+</ul>
+<p>So <code>volatile</code> is right for a stop flag, which is a single write and a single read. It is wrong for a counter: with a <code>volatile int</code>, two threads doing <code>count++</code> a million times each still reached only about 1.3 million in my test, because <code>++</code> is three steps (lesson 8).</p>
+
+<h2>3 · Static methods lock the class</h2>
+<p class="slides">Deck 3 · slides 37–43</p>
+
+<p>A <code>synchronized</code> instance method locks <code>this</code>. A <code>synchronized static</code> method has no <code>this</code>, so it locks the <strong>class object</strong>, written <code>Counter.class</code> (slides 38–40). These are two different locks:</p>
+<pre>class Counter {
+    private static int next = 0;
+    // locks Counter.class
+    synchronized static int getNext() {
+        next++; return next;
+    }
+    // locks this: same data, other lock!
+    synchronized void reset() { next = 0; }
+}</pre>
+
+<p>That's slide 42's bug: <code>getNext</code> and <code>reset</code> can run at the same time and corrupt <code>next</code> (slide 41). Slide 43's fix is to make the instance method take the class lock:</p>
+<pre>void reset() {
+    synchronized (this.getClass()) { next = 0; }
+}</pre>
+<span class="sidenote"><code>Counter.class</code> is safer than <code>this.getClass()</code>: if <code>reset</code> were called on an object of a subclass, <code>getClass()</code> would return the subclass, which is yet another lock.</span>
+
+<p>The rule: <strong>static data needs the class lock, every time.</strong></p>
+
+<h2>4 · Reentrant locks</h2>
+<p class="slides">Deck 3 · slides 44–47</p>
+
+<p>Slide 45's stack has <code>synchronized push</code>, which calls <code>synchronized full</code> on the same object. The thread already holds the lock when it calls <code>full</code>. Does it wait for itself forever? No. Java's locks are <strong>reentrant</strong>: a thread that holds a lock can enter other blocks guarded by the same lock (slide 44). This also lets you call several synchronized methods in a row inside one bigger synchronized block, without another thread getting in between.</p>
+
+<h2>5 · Monitors</h2>
+<p class="slides">Deck 3 · slides 48–49</p>
+
+<p>The theory name for all this is a <strong>monitor</strong> (slide 48): data plus a lock that gives one thread at a time exclusive access, plus a queue of threads waiting to enter. A Java object with synchronized methods is a monitor. The name goes back to Brinch Hansen and Hoare in 1973, from lesson 3's history slide.</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">What does <code>volatile</code> give you that a plain field doesn't?</p>
+<div class="options">
+<button class="opt" data-correct>visibility only</button>
+<button class="opt">atomicity only</button>
+<button class="opt">visibility and atomicity</button>
+<button class="opt">mutual exclusion</button>
+</div>
+<p class="why">Slide 36: a lock gives atomicity and visibility; <code>volatile</code> only visibility. A <code>volatile</code> counter still loses updates under <code>++</code>.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Which lock does a <code>synchronized static</code> method take?</p>
+<div class="options">
+<button class="opt" data-correct>the class object, e.g. Counter.class</button>
+<button class="opt">the object it was called through</button>
+<button class="opt">no lock: static methods are shared</button>
+<button class="opt">a new lock on each call</button>
+</div>
+<p class="why">There is no <code>this</code> in a static method, so Java locks the class object. Instance methods lock <code>this</code>, a different lock, which is slide 41's problem.</p>
+</div>
+
+<div class="quiz">
+<p class="q">A thread inside synchronized <code>push()</code> calls synchronized <code>full()</code> on the same object. What happens?</p>
+<div class="options">
+<button class="opt" data-correct>it enters: locks are reentrant</button>
+<button class="opt">it deadlocks waiting for itself</button>
+<button class="opt">it throws an exception</button>
+<button class="opt">full() runs without any lock</button>
+</div>
+<p class="why">A thread that already holds a lock can take it again (slide 44). Without reentrancy, any synchronized method calling another synchronized method would hang.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Only <code>terminate()</code> is synchronized; <code>run()</code> loops on a plain <code>go</code>. Is the thread guaranteed to stop?</p>
+<div class="options">
+<button class="opt" data-correct>no: the reader takes no lock</button>
+<button class="opt">yes: synchronized writes are seen</button>
+<button class="opt">yes, but only after a sleep()</button>
+<button class="opt">no: terminate() can't be synchronized</button>
+</div>
+<p class="why">Visibility comes from the reader and writer taking the <em>same</em> lock (slide 32). With only the writer locked, the reader may keep its cached <code>true</code> forever; in my test it did.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0009/TwoLocks.java"><code>lessons/code/0009/TwoLocks.java</code></a>. <code>Ticket</code> is slide 42's static-versus-instance bug; <code>Timer</code> is slide 35's solution (1). Fill in the two <code>TODO</code>s, then run:</p>
+<pre class="language-bash">cd lessons/code/0009
+java TwoLocks.java</pre>
+<p>Unchanged, it prints about 1.75 million instead of 2 million, and the timer never stops. The program gives up after 2 seconds so you don't have to kill it. Your goal is <code>PASS</code>.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>TODO 1: replace the method's <code>synchronized</code> keyword with a <code>synchronized (Ticket.class) { … }</code> block inside it. TODO 2 has two correct answers: one keyword on the field, or a synchronized getter that the loop calls.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Use <code>synchronized (this)</code> in <code>skip</code>. Why does that change nothing? (b) Make <code>ticks</code> <code>volatile</code> instead of <code>go</code>. Does the timer stop?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>void skip() {                                  // TODO 1
+    synchronized (Ticket.class) { next++; }
+}
+
+private volatile boolean go = true;            // TODO 2
+// or: synchronized boolean isGo() { return go; }
+//     public void run() { while (isGo()) ticks++; }</pre>
+<p>(a) A synchronized instance method already locks <code>this</code>, so you'd still be on the wrong lock. (b) Don't rely on it: <code>volatile</code> only guarantees the variable it's on. Make the flag that's being read <code>volatile</code>.</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Distinguish atomicity and visibility, and state what <code>synchronized</code> and <code>volatile</code> each guarantee. (4 marks)</summary>
+<p>Atomicity: an action happens as one indivisible step, so no thread sees it half-done (e.g. a whole <code>count++</code>). Visibility: a value written by one thread is seen by other threads that read it later. Without synchronization neither is guaranteed, because of caching and reordering. <code>synchronized</code> (a common lock) gives both: mutual exclusion inside the block, and a thread taking a lock sees all changes made before the previous release of that lock. <code>volatile</code> gives visibility only: reads always see the latest write, but compound actions like <code>++</code> can still interleave.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> Oracle's <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/memconsist.html">Memory Consistency Errors</a> and <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/locksync.html">Intrinsic Locks and Synchronization</a> (which covers static locks and reentrancy). About 8 minutes. Then reread <strong>Deck 3, slides 30–43</strong>.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Lock vs <code>volatile</code>, in one line.</summary><p>A lock gives atomicity and visibility; <code>volatile</code> gives visibility only.</p></details>
+<details class="recall"><summary>Which lock protects <code>static</code> data?</summary><p>The class lock, <code>ClassName.class</code>, which is what <code>synchronized static</code> methods use. Instance methods must lock it explicitly.</p></details>
+<details class="recall"><summary>Why must a check-then-act be inside one lock? (lesson 8)</summary><p>Otherwise another thread can change the state between the check and the act, e.g. two withdrawals both passing the balance check.</p></details>
+
+<div class="next"><a href="0008-synchronized.html">← Lesson 8: synchronized</a><a href="0010-thread-safe-classes.html">Lesson 10: thread-safe classes →</a></div>
+
+<footer class="ask">Is “visibility” still abstract? Ask your teacher (the agent) in the terminal for a demo that shows it step by step.</footer>
+</main>
+</body>
+</html>

@@ -104,13 +104,46 @@ for (Future&lt;Long&gt; f : fs) total += f.get();  // get all
 pool.shutdown();                  // or the JVM never exits</pre>
 <p>For uneven work, submit many small pieces (e.g. 1,000 items each) instead of k big ones (D2 s78).</p>
 
+<h2>Fork/Join (D2 s79–98)</h2>
+<pre>class Sum extends RecursiveTask&lt;Long&gt; {
+    protected Long compute() {
+        if (ub - lb &lt;= BASE) { /* plain loop */ }
+        int mid = lb + (ub - lb) / 2;
+        Sum l = new Sum(data, lb, mid);
+        Sum r = new Sum(data, mid, ub);
+        l.fork(); r.fork();          // fork both first
+        return r.join() + l.join();
+    }
+}
+long s = new ForkJoinPool().invoke(new Sum(data, 0, n));</pre>
+
+<h2>Locking (D3 s5–43)</h2>
+<pre>synchronized (lock) { /* one thread at a time */ }
+synchronized void inc() { x++; }     // locks this
+synchronized static void f() { }    // locks Cls.class
+void g() { synchronized (Cls.class) { next = 0; } }</pre>
+<p>Lock every access to shared data, and the whole compound action. A lock gives atomicity and visibility; <code>volatile</code> gives visibility only.</p>
+
+<h2>ReentrantLock (D3 s77–91)</h2>
+<pre>import java.util.concurrent.locks.*;
+
+Lock lock = new ReentrantLock();     // (true) = fair
+lock.lock();
+try { /* critical section */ }
+finally { lock.unlock(); }
+
+if (lock.tryLock()) {                // don't wait
+    try { /* ... */ } finally { lock.unlock(); }
+}</pre>
+<p>Need two locks? Always take them in the same order, e.g. lower index first.</p>
+
 <h2>Shared vs private</h2>
 <div class="table-wrap"><table>
 <tr><th>Shared between threads</th><th>Private to each thread</th></tr>
 <tr><td>Objects and their fields; arrays; <code>static</code> variables</td><td>Local variables and parameters (each thread has its own stack)</td></tr>
 </table></div>
 
-<p class="slides">Sources: Deck 1 slides 41–79, Deck 2 slides 22–78; <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html">java.lang.Thread Javadoc</a>; <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/">Oracle Concurrency tutorial</a>.</p>
+<p class="slides">Sources: Deck 1 slides 41–79, Deck 2 slides 22–98, Deck 3 slides 5–91; <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html">java.lang.Thread Javadoc</a>; <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/">Oracle Concurrency tutorial</a>.</p>
 </main>
 </body>
 </html>

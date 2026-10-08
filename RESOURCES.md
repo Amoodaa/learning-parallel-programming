@@ -2,7 +2,7 @@
 
 ## Knowledge
 
-- `source-materials/` (lecture slides): **the syllabus**. Everything taught comes from here. Lecture_1_MSCC_PDP_Introduction.pptx (95 slides), ElementaryParallelism.pptx (100 slides). Slide-by-slide map and errata: reference/course-map.html.
+- `source-materials/` (lecture slides): **the syllabus**. Everything taught comes from here. Lecture_1_MSCC_PDP_Introduction.pptx (95 slides), ElementaryParallelism.pptx (100 slides), SharingResources.ppt (101 slides; old binary format, read it via `soffice --headless --convert-to pptx`). Slide-by-slide map and errata: reference/course-map.html.
 - [Oracle Java Tutorial: Concurrency trail](https://docs.oracle.com/javase/tutorial/essential/concurrency/)
   Short official pages covering almost exactly the slides' Java topics (threads, sleep, join, sync, deadlock, executors, pools, fork/join). Use for: the explanations the slides leave out. Primary reading for most lessons.
 - [Java SE 21 API Javadoc: java.lang.Thread](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html), [Thread.State](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.State.html), [RecursiveAction](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/RecursiveAction.html)
@@ -18,5 +18,5 @@
 
 ## Gaps
 
-- No slides yet for: synchronization/locking, condition variables, semaphores/latches/barriers, C, OpenMP, MPI (listed in Deck 1 s3 course content). Add them to `source-materials/` when released.
+- No slides yet for: condition variables (wait/notify), semaphores/latches/barriers, C, OpenMP, MPI (listed in Deck 1 s3 course content). Add them to `source-materials/` when released.
 - No past exam papers. These would sharpen the theory lessons a lot.
