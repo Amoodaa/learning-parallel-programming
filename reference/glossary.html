@@ -92,6 +92,30 @@
 <dt>CPU-bound / I/O-bound</dt>
 <dd>A thread that spends its time computing / waiting on disk, network or a user.</dd>
 </dl>
+
+<h2>Splitting &amp; pools</h2>
+<dl>
+<dt>Fair split</dt>
+<dd>Boundaries <code>index[j] = j*N/k</code> for j = 0..k; thread j gets <code>[index[j], index[j+1])</code>. Pieces differ in size by at most 1 (D2 s22–24). <a href="../lessons/0004-fair-splitting.html">Lesson 4</a>.</dd>
+
+<dt><code>availableProcessors()</code></dt>
+<dd>How many processors the JVM can use: the right thread count for CPU-bound work (D2 s14, 26).</dd>
+
+<dt>Thread pool</dt>
+<dd>A fixed set of threads that take tasks from a shared queue, run them, and come back for more (D2 s44–45). <a href="../lessons/0005-thread-pools.html">Lesson 5</a>.</dd>
+
+<dt><code>ExecutorService</code></dt>
+<dd>Java's pool type. Made by <code>Executors.newFixedThreadPool(k)</code>; <code>submit</code> queues a task, <code>shutdown</code> lets it finish and end.</dd>
+
+<dt><code>Callable&lt;V&gt;</code></dt>
+<dd>A task whose <code>call()</code> returns a <code>V</code> and may throw. <code>Runnable</code> is the version that returns nothing.</dd>
+
+<dt><code>Future&lt;V&gt;</code></dt>
+<dd>Returned by <code>submit</code>. <code>get()</code> waits for the task, then returns its result: <code>join()</code> and <code>getResult()</code> in one.</dd>
+
+<dt>Uneven work</dt>
+<dd>Equal-sized pieces that take different times (large primes cost more), so some threads finish early and sit idle (D2 s77). Fix: many small tasks in a pool (s78). <a href="../lessons/0006-uneven-work.html">Lesson 6</a>.</dd>
+</dl>
 </main>
 </body>
 </html>

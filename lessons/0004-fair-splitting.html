@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fair Splitting</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 4 of 7 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Fair Splitting</h1>
+<p class="subtitle">How many threads to use, and how to give each one the same amount of work.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll write the one-line formula that splits any array over one thread per core, and run lesson 1's sum on all your cores. About 25 minutes.</p>
+
+<p>Deck 2 slides 2–41 look like five unrelated programs. They are one argument: each program shows a problem with the previous approach, and slide 24's formula fixes the last of them.</p>
+
+<h2>1 · It really is faster</h2>
+<p class="slides">Deck 2 · slides 2–13</p>
+
+<p>Slides 2–4 are lesson 1's pattern applied to a search. Slide 5 admits it's too small: with 100 elements, <strong>creating the threads costs more than the search</strong>. That sentence comes back at slide 21.</p>
+
+<p>Slides 8–12 do something big enough to be worth it. Two threads each selection-sort one half of a million numbers, then <code>main</code> merges the halves. Slide 13 reports about 4× faster on 2 cores.</p>
+<span class="sidenote">Why 4× and not 2×? Selection sort takes about n² steps. Two halves take 2·(n/2)² = n²/2, so splitting alone halves the work, and running the halves at the same time halves it again. This explanation is mine; the slides give only the number.</span>
+
+<h2>2 · Too many threads is slower</h2>
+<p class="slides">Deck 2 · slides 14–21</p>
+
+<p>If 2 threads help, why not one thread per element? Slides 15–20 try it with <strong>rank sort</strong>. An element's rank is how many elements are smaller than it, and that is its position in the sorted array:</p>
+
+<pre>int rank = 0;
+for (int j = 0; j &lt; data.length; j++)
+    if (data[j] &lt; data[i]) rank++;
+copy[rank] = data[i];   // assumes no duplicates</pre>
+
+<p>Every element's rank can be computed independently, so slide 19 starts a <code>RankerNoDup</code> thread for each of the 100,000 elements. Slide 21: 75.4 s, against 72.5 s with no threads at all. The parallel version lost.</p>
+
+<p>Slide 14 gives the rule this example teaches:</p>
+<ul>
+<li>A CPU-bound program can't run more threads at once than there are processors. Extra threads only wait their turn, and each one still costs time to create and schedule.</li>
+<li>So for CPU-bound work, use <strong>as many threads as processors</strong>, and share the work as fairly as possible between them.</li>
+<li>I/O-bound work is different: those threads spend most of their time waiting, so more threads than cores can help (lesson 3's CPU- vs I/O-bound).</li>
+</ul>
+
+<p>Java tells you the number of processors:</p>
+<pre>int k = Runtime.getRuntime().availableProcessors();</pre>
+<span class="sidenote">Javadoc: “Returns the number of processors available to the Java virtual machine.” <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Runtime.html">java.lang.Runtime</a>. <code>Runtime.getRuntime()</code> is just how you get the one <code>Runtime</code> object.</span>
+
+<h2>3 · The fair-split formula</h2>
+<p class="slides">Deck 2 · slides 22–27</p>
+
+<p>Now split N items over k threads so no two pieces differ in size by more than 1 (slide 22). The obvious way fails. With N = 103 and k = 4, a base size of N/k = 25 leaves 3 items over, and if the last thread takes them the pieces are 25, 25, 25, 28 (slide 23).</p>
+
+<p>Slide 24's fix is to compute k+1 <strong>boundaries</strong> instead of a size:</p>
+
+<pre>int[] index = new int[k + 1];
+for (int j = 0; j &lt;= k; j++)
+    index[j] = (j * N) / k;
+// thread j gets [index[j], index[j+1])</pre>
+
+<p>For N = 103, k = 4 this gives 0, 25, 51, 77, 103, so the pieces are 25, 26, 26, 26. Integer division rounds each boundary down, and that spreads the leftover items one at a time across the pieces. The first boundary is always 0 and the last is always N, so nothing is skipped.</p>
+
+<div class="callout warn">
+<p><code>j * N</code> overflows <code>int</code> when N is large. With N = <code>Integer.MAX_VALUE</code> (the happy-numbers range) and k = 8, the boundaries come out as <code>0 268435455 0 …</code>. Write <code>(int) ((long) j * N / k)</code> instead: casting <code>j</code> to <code>long</code> makes the multiplication happen in 64 bits.</p>
+</div>
+
+<p>Slide 26 plugs it into rank sort, with one <code>RankerNoDup</code> per processor, each looping over its own segment. (The constructor on slide 26 doesn't match slide 18; see the <a href="../reference/course-map.html#errata">errata</a>.) The result on slide 27: about 2× on 2 cores and about 8× on 8.</p>
+
+<h2>4 · Same recipe, bigger job</h2>
+<p class="slides">Deck 2 · slides 28–41</p>
+
+<p>Happy numbers (slides 28–37) is not a new idea, just a CPU-heavy job to practise the split on: test every number up to <code>Integer.MAX_VALUE</code>. For the parallel part, <code>isHappy(n)</code> is simply “some work per number”. One <code>HappyNumFinder</code> per processor takes it from 420 s to 159 s (slides 38, 41).</p>
+
+<p>Slide 39 splits with <code>base = MAX / numProc</code>, the slide 23 approach, and it never gives the leftover numbers to anyone, so up to <code>numProc − 1</code> numbers at the end are never tested. The formula from slide 24 doesn't have this problem.</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">Use slide 24's formula with N = 10 and k = 4. What are the boundaries?</p>
+<div class="options">
+<button class="opt" data-correct>0, 2, 5, 7, 10</button>
+<button class="opt">0, 2, 4, 6, 10</button>
+<button class="opt">0, 3, 6, 9, 10</button>
+<button class="opt">0, 2, 5, 8, 10</button>
+</div>
+<p class="why">j·10/4 rounded down: 0, 2 (2.5), 5, 7 (7.5), 10. The pieces are 2, 3, 2, 3, so none differs by more than 1. <code>0, 2, 4, 6, 10</code> is the base-size approach, with the leftovers all dumped on the last thread.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Rank sort with one thread per element was slower than no threads. Why?</p>
+<div class="options">
+<button class="opt" data-correct>thread overhead beats any gain</button>
+<button class="opt">rank sort cannot be parallelised</button>
+<button class="opt">the threads deadlock on the array</button>
+<button class="opt">join() waits for each thread twice</button>
+</div>
+<p class="why">Only as many threads as processors can run at once. The other 99,998 add creation and scheduling cost without adding speed. The algorithm itself parallelises fine: slide 27 gets 8× with the same ranking code.</p>
+</div>
+
+<div class="quiz">
+<p class="q">A CPU-bound job on an 8-core machine. How many threads should do the work?</p>
+<div class="options">
+<button class="opt" data-correct>8, one per core</button>
+<button class="opt">1, to avoid all overhead</button>
+<button class="opt">16, to keep cores busy</button>
+<button class="opt">one per data element</button>
+</div>
+<p class="why">Slide 14: use the maximum number of processors, but more threads than processors is counter-productive for CPU-bound work. More would only help if the threads spent time waiting on I/O.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Slide 39 uses <code>base = MAX / numProc</code> with segments <code>[j·base, (j+1)·base)</code>. What goes wrong?</p>
+<div class="options">
+<button class="opt" data-correct>the last few numbers are skipped</button>
+<button class="opt">some numbers are tested twice</button>
+<button class="opt">the last thread gets extra work</button>
+<button class="opt">nothing, it is the same formula</button>
+</div>
+<p class="why">The last segment ends at <code>numProc·base</code>, which is less than MAX whenever MAX isn't a multiple of <code>numProc</code>. The remainder is never handed out. Slide 24's boundaries always end at exactly N.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0004/FairSplit.java"><code>lessons/code/0004/FairSplit.java</code></a>. It has lesson 1's <code>Summer</code> class, but now there are <code>k</code> of them, one per core, over 10,000,003 numbers (deliberately not a multiple of <code>k</code>). Fill in the three <code>TODO</code>s, then run:</p>
+<pre class="language-bash">cd lessons/code/0004
+java FairSplit.java</pre>
+<p>It first checks your boundaries against slide 24's example, then runs the sum. Your goal is <code>PASS</code>.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>TODO 1 is slide 24's formula with the <code>long</code> cast from the warning box. TODOs 2 and 3 are lesson 1's steps 2 and 3, written as two loops over <code>workers</code>: start them all in one loop, then join them all in a second loop.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Move the <code>join()</code> into the same loop as <code>start()</code>. It still prints <code>PASS</code>. What did you lose? (b) Replace TODO 1 with the slide 23 approach, <code>index[j] = j * (n / k)</code> plus <code>index[k] = n</code>. What does the first check print?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>index[j] = (int) ((long) j * n / k);   // TODO 1
+
+for (Summer w : workers) w.start();    // TODO 2
+for (Summer w : workers) w.join();     // TODO 3</pre>
+<p><code>for (Summer w : workers)</code> is Java's for-each loop: it runs once per element, with <code>w</code> set to each worker in turn. (a) Starting and joining in one loop waits for worker 0 before starting worker 1, so the threads run one after another (lesson 1's warning). (b) <code>[0, 25, 50, 75, 103]</code>: the last piece is 28, three more than the others.</p>
+</details>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> reread <strong>Deck 2, slides 14–27</strong>, in order. Slide 14 is the rule, 15–21 show what breaks it, 22–27 fix it. They should now read as one argument.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Write the fair-split loop for N items over k threads.</summary><p><code>for (j = 0; j &lt;= k; j++) index[j] = (int) ((long) j * N / k);</code> Thread j gets <code>[index[j], index[j+1])</code>.</p></details>
+<details class="recall"><summary>How many threads for CPU-bound work, and why not more?</summary><p>One per processor (<code>availableProcessors()</code>). Extra threads can't run at the same time; they only add creation and scheduling cost.</p></details>
+<details class="recall"><summary>Why must every <code>start()</code> come before any <code>join()</code>? (lesson 1)</summary><p><code>join()</code> waits for that thread to finish. Joining before the next <code>start()</code> means the next thread doesn't begin until the previous one is done, so nothing runs in parallel.</p></details>
+
+<div class="next"><a href="0003-theory-pack.html">← Lesson 3: theory pack</a><a href="0005-thread-pools.html">Lesson 5: thread pools →</a></div>
+
+<footer class="ask">Want the rank sort or happy-numbers code from the slides fixed and runnable, or a different split to practise on? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

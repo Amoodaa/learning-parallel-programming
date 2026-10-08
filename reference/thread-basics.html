@@ -80,13 +80,37 @@ private volatile boolean go = true;
 public void run() { while (go) { ... } }
 public void terminate() { go = false; }</pre>
 
+<h2>Fair split (D2 s22–27)</h2>
+<pre>int k = Runtime.getRuntime().availableProcessors();
+int[] index = new int[k + 1];
+for (int j = 0; j &lt;= k; j++)
+    index[j] = (int) ((long) j * N / k);
+// worker j gets [index[j], index[j+1])</pre>
+
+<h2>Pool, Callable, Future (D2 s43–72)</h2>
+<pre>import java.util.*;
+import java.util.concurrent.*;
+
+class Sum implements Callable&lt;Long&gt; {
+    public Long call() { /* work */ return s; }
+}
+
+ExecutorService pool = Executors.newFixedThreadPool(k);
+List&lt;Future&lt;Long&gt;&gt; fs = new ArrayList&lt;&gt;();
+for (int j = 0; j &lt; k; j++)                 // submit all
+    fs.add(pool.submit(new Sum(/* range j */)));
+long total = 0;
+for (Future&lt;Long&gt; f : fs) total += f.get();  // get all
+pool.shutdown();                  // or the JVM never exits</pre>
+<p>For uneven work, submit many small pieces (e.g. 1,000 items each) instead of k big ones (D2 s78).</p>
+
 <h2>Shared vs private</h2>
 <div class="table-wrap"><table>
 <tr><th>Shared between threads</th><th>Private to each thread</th></tr>
 <tr><td>Objects and their fields; arrays; <code>static</code> variables</td><td>Local variables and parameters (each thread has its own stack)</td></tr>
 </table></div>
 
-<p class="slides">Sources: Deck 1 slides 41–79; <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html">java.lang.Thread Javadoc</a>; <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/">Oracle Concurrency tutorial</a>.</p>
+<p class="slides">Sources: Deck 1 slides 41–79, Deck 2 slides 22–78; <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html">java.lang.Thread Javadoc</a>; <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/">Oracle Concurrency tutorial</a>.</p>
 </main>
 </body>
 </html>

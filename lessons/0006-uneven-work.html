@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uneven Work</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 6 of 7 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Uneven Work</h1>
+<p class="subtitle">When equal-sized pieces aren't equal work, cut the job into many small pieces and let a pool share them out.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll write the loop that cuts a range into pieces, then watch one thread sit idle with big pieces and both stay busy with small ones. About 20 minutes.</p>
+
+<p>Deck 2 slides 73–78 are six slides, two of which just say “Why?”. Here lesson 4's fair split stops working, and lesson 5's pool fixes it.</p>
+
+<h2>1 · The job</h2>
+<p class="slides">Deck 2 · slides 73–75</p>
+
+<p>Count the primes between 1 and 10,000,000. Slide 75 tests each number by trying every divisor up to its square root:</p>
+
+<pre>static boolean isPrime(int n) {
+    if (n &lt; 2) return false;
+    for (int k = 2; k &lt;= (int) Math.sqrt(n); k++)
+        if (n % k == 0) return false;
+    return true;
+}</pre>
+
+<p>(The slide uses a <code>prime</code> flag, but it's the same test.) The key point: <strong>the cost of a test depends on n</strong>:</p>
+<ul>
+<li>Most composite numbers stop early. Even numbers stop at k = 2.</li>
+<li>A prime tries every k up to √n. Near 1,000 that's about 31 tries; near 10,000,000 it's about 3,162.</li>
+</ul>
+<p>So testing the numbers from 5 million to 10 million takes much longer than testing the numbers from 1 to 5 million, even though both ranges contain the same count of numbers.</p>
+<span class="sidenote">This is my explanation of the slides' “Why?”; the slides only state the result. The measurements below back it up.</span>
+
+<h2>2 · Fair is not equal</h2>
+<p class="slides">Deck 2 · slides 76–77</p>
+
+<p>Single-threaded, the count took 36 s (slide 76). Slide 76 then applies lesson 4's recipe: one thread per core, equal-sized ranges. On the dual-core machine that should give about 18 s. Slide 77: 24 s, “only 33% gain”. (“Gain” here means the time went down by a third, from 36 to 24. A perfect split on 2 cores would halve it, which is 50%.)</p>
+
+<p>The slide's own answer is that some threads finished before others and lay idle. Here is the exercise below, run with 2 threads on my machine (Java 26):</p>
+
+<pre class="language-plaintext">no threads   2.8 s
+thread 0     ███████████████░░░░░░░░░  1–5M, done 1.05 s
+thread 1     ████████████████████████  5–10M, done 1.75 s
+total 1.75 s: 38% faster, not 50%</pre>
+
+<p>Thread 0 has the cheap half. It finishes and has nothing left to do, so for 40% of the run one of the two cores is wasted. The pieces were <strong>equal in size</strong>, which is what lesson 4's formula guarantees, but <strong>not equal in work</strong>.</p>
+
+<h2>3 · Many small pieces</h2>
+<p class="slides">Deck 2 · slide 78</p>
+
+<p>Slide 78's fix doesn't try to predict anything:</p>
+<ol class="steps">
+<li>Cut the range into <strong>small</strong> pieces, e.g. 1,000 numbers each: 10,000 tasks.</li>
+<li>Submit them all to a pool with one thread per core (lesson 5).</li>
+<li>Whichever thread is free takes the next piece from the queue.</li>
+</ol>
+
+<p>A thread that gets cheap pieces simply comes back for more pieces more often. Both threads stay busy until the queue is empty, and at the end the most either one can sit idle is about one small piece. Slide 78 reports the expected 50%. On my machine: 1.41 s, 50% faster than no threads.</p>
+
+<div class="callout warn">
+<p>This needs a pool. Starting 10,000 <code>Thread</code>s yourself would repeat lesson 4's rank-sort mistake. In a pool, the same two threads do all 10,000 tasks.</p>
+</div>
+
+<p>How small is small enough? Each task has a cost too: an object, a trip through the queue, a <code>Future</code>. Pieces of 1 number (10 million tasks) took 3.8 s on my machine, slower than no threads at all. Pieces too big leave threads idle; pieces too small spend their time on overhead. Slide 78's 1,000 sits in the comfortable middle, but the slides don't say how to choose it. Fork/Join (lesson 7) avoids choosing: each task splits itself in half until it is small, and idle threads take work from busy ones.</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">Two threads, equal-sized halves of 1..10M. Why only 33% faster instead of 50%?</p>
+<div class="options">
+<button class="opt" data-correct>one half finished early, then idled</button>
+<button class="opt">two threads cost more than they save</button>
+<button class="opt">the halves differ in size by one</button>
+<button class="opt">the threads deadlocked for a while</button>
+</div>
+<p class="why">Slide 77: some threads finished before others and lay idle. Large numbers cost more to test, so the 1–5M half was much less work than the 5–10M half.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Which single test is the most expensive for slide 75's <code>isPrime</code>?</p>
+<div class="options">
+<button class="opt" data-correct>a large prime, near 10M</button>
+<button class="opt">a large even number, near 10M</button>
+<button class="opt">a small prime, near 1,000</button>
+<button class="opt">all of them cost the same</button>
+</div>
+<p class="why">A prime never finds a divisor, so it tries every k up to √n. The larger n is, the more tries. An even number stops at k = 2 however large it is.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Slide 78 makes 10,000 small tasks. Why run them in a pool instead of 10,000 threads?</p>
+<div class="options">
+<button class="opt" data-correct>creating threads costs too much</button>
+<button class="opt">Thread cannot return a result</button>
+<button class="opt">Java allows at most 16 threads</button>
+<button class="opt">threads cannot share an array</button>
+</div>
+<p class="why">Same lesson as rank sort (lesson 4): more threads than cores only adds creation and scheduling cost. A pool reuses one thread per core for every task.</p>
+</div>
+
+<div class="quiz">
+<p class="q">You change the piece size from 1,000 to 1. What happens to the run time?</p>
+<div class="options">
+<button class="opt" data-correct>slower: overhead per task</button>
+<button class="opt">faster: perfect balance</button>
+<button class="opt">unchanged: same total work</button>
+<button class="opt">it no longer compiles</button>
+</div>
+<p class="why">10 million tasks means 10 million objects, queue operations and Futures. On my machine that took 3.8 s, slower than no threads (2.8 s). Balance is perfect, but the overhead eats the gain.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0006/UnevenPrimes.java"><code>lessons/code/0006/UnevenPrimes.java</code></a>. The <code>Count</code> task and the pool are already written. Fill in the one <code>TODO</code> in <code>countPrimes</code>: the loop that cuts <code>[0, N)</code> into pieces of size <code>chunk</code>. The same loop is used for the big pieces and the small ones. Then run:</p>
+<pre class="language-bash">cd lessons/code/0006
+java UnevenPrimes.java</pre>
+<p>It takes about 5 seconds. It first checks pieces of 3,000,000, which don't divide 10M evenly, so the last piece must stop at N. Then it times both versions. Your goal is <code>PASS</code>, and to see the gap between the two piece finish times.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>A <code>for</code> loop where <code>from</code> starts at 0 and goes up by <code>chunk</code> while <code>from &lt; N</code>. Each piece ends at <code>from + chunk</code>, or at <code>N</code> if that is smaller: <code>Math.min(a, b)</code>. Submit a <code>new Count(from, to)</code> and add its Future to <code>futures</code>, as in lesson 5.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Drop the <code>Math.min</code> and use <code>from + chunk</code> as the end. Which check fails, and what does it count? (b) Change <code>1000</code> in <code>main</code> to <code>10</code>, then to <code>1</code>. When does the small-piece version get slower than the big-piece version?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>for (int from = 0; from &lt; N; from += chunk) {
+    int to = Math.min(from + chunk, N);
+    futures.add(pool.submit(new Count(from, to)));
+}</pre>
+<p>(a) The 3,000,000 check: the last piece runs to 12M and counts 788,060 primes. (b) On my machine, pieces of 10 took 1.57 s, still faster than two big pieces (1.75 s). Pieces of 1 took 3.8 s, slower than both, and slower than no threads.</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Counting primes up to N on a dual-core machine, an equal split over 2 threads gave only 33% gain. Explain why, and describe a better approach. (5 marks)</summary>
+<p>The cost of testing a number grows with its size (trial division up to √n), so equal-sized ranges are not equal work. The thread with the small numbers finishes early and sits idle while the other is still working, so both cores are busy for only part of the run. Better: divide the range into many small segments (e.g. 1,000 numbers) and submit them as tasks to a fixed thread pool with one thread per core. A thread that finishes a segment takes the next from the queue, so neither core idles until the work runs out, giving close to 50% (2×). Segments must not be too small, or task overhead outweighs the gain.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> reread <strong>Deck 2, slides 73–78</strong>; they're short, and every “Why?” should now have an answer. Then glance at slides 79–81, the start of Fork/Join, and notice it is answering this lesson's “how small is small enough?”.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Why did equal-sized pieces give unequal work for primes?</summary><p>Testing a large number takes more tries (up to √n) than a small one, so the range of large numbers is more work.</p></details>
+<details class="recall"><summary>Two ways small pieces can go wrong.</summary><p>Run as threads instead of pool tasks, they repeat rank sort's thread-creation overhead. Made too small, even pool tasks spend more time on overhead than on work.</p></details>
+<details class="recall"><summary>What does <code>future.get()</code> replace from lesson 1? (lesson 5)</summary><p>Both <code>join()</code> and <code>getResult()</code>: it waits for the task, then returns its result.</p></details>
+
+<div class="next"><a href="0005-thread-pools.html">← Lesson 5: thread pools</a><span>Lesson 7: Fork/Join →</span></div>
+
+<footer class="ask">Want to see the idle time on all your cores instead of 2, or try predicting a better split? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

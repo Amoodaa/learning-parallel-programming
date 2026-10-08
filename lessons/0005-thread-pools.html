@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thread Pools</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 5 of 7 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Thread Pools</h1>
+<p class="subtitle">Stop making threads yourself: hand tasks to a pool and collect the results.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll rewrite lesson 4's sum so a pool runs it, using <code>Callable</code> and <code>Future</code>, and see it print <code>PASS</code>. About 25 minutes.</p>
+
+<p>Deck 2 slides 43–72 introduce a lot of new Java names at once. Each one replaces something you already know from lessons 1 and 4, and the table in section 4 lines them up. Slides 67–72 then redo lesson 4's sum with them.</p>
+
+<h2>1 · Why a pool</h2>
+<p class="slides">Deck 2 · slides 43–46</p>
+
+<p>Lesson 4 showed that threads cost something to create. A <strong>thread pool</strong> creates a fixed number of threads <em>once</em> and reuses them. Work is handed over as <strong>tasks</strong>, which wait in a shared queue (slide 44). Each pool thread repeats the same loop (slide 45):</p>
+<ol class="steps">
+<li>Take the next task from the queue, waiting if it's empty.</li>
+<li>Run it.</li>
+<li>Go back for another.</li>
+</ol>
+<p>This separates <em>what</em> to do (the tasks) from <em>who</em> does it (the pool's threads). Servers use pools so they don't create a new thread for every request (slide 46).</p>
+<span class="sidenote">Oracle: “Using worker threads minimizes the overhead due to thread creation.” A fixed pool also degrades gracefully: under heavy load it slows down instead of collapsing under thousands of threads. <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/pools.html">Thread Pools</a></span>
+
+<h2>2 · Create, submit, shut down</h2>
+<p class="slides">Deck 2 · slides 47–49, 52–60</p>
+
+<pre>import java.util.concurrent.*;   // all the pool classes
+
+ExecutorService pool =
+    Executors.newFixedThreadPool(k);  // k threads
+pool.submit(task);   // queue a task; returns at once
+pool.shutdown();     // accept no more; finish the queue</pre>
+
+<p><code>ExecutorService</code> is the pool's type, and <code>Executors</code> (with an s) is the class whose static methods make pools. <code>submit</code> doesn't run the task in <code>main</code>; it puts it in the queue and returns immediately, just as <code>start()</code> returns immediately.</p>
+
+<div class="callout warn">
+<p><strong>Always call <code>shutdown()</code>.</strong> The pool's threads keep waiting for more tasks, and the JVM doesn't exit while they're alive. Forget it and your program prints its answer and then hangs (I checked this on Java 26). <code>shutdown()</code> doesn't wait for anything; it lets the queued tasks finish and then lets the threads end.</p>
+</div>
+
+<p>To wait for everything, slide 58 calls <code>shutdown()</code> and then <code>awaitTermination(1000L, TimeUnit.SECONDS)</code>, which blocks until all tasks have finished or the timeout passes (slide 49). Slide 54 waits a different way: through the tasks' <code>Future</code>s (section 4).</p>
+<span class="sidenote">Javadoc for <code>shutdown()</code>: “previously submitted tasks are executed, but no new tasks will be accepted … This method does not wait for previously submitted tasks to complete execution. Use awaitTermination to do that.” <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ExecutorService.html">ExecutorService</a></span>
+
+<h2>3 · <code>Runnable</code> or <code>Callable</code></h2>
+<p class="slides">Deck 2 · slides 51, 55, 61–64</p>
+
+<p>A task is one of two kinds (slide 51):</p>
+<ul>
+<li><strong><code>Runnable</code></strong>: <code>void run()</code>. Returns nothing. This is the same interface as lesson 1's Way B. Slides 55 and 60 are Runnables.</li>
+<li><strong><code>Callable&lt;V&gt;</code></strong>: <code>V call()</code>. <strong>Returns a value</strong> of type <code>V</code>, and may throw an exception (slides 61–62).</li>
+</ul>
+
+<pre>class Square implements Callable&lt;Integer&gt; {
+    private int n;
+    Square(int k) { n = k; }
+    public Integer call() { return n * n; }
+}</pre>
+
+<p>Syntax: <code>&lt;Integer&gt;</code> is a <strong>generic</strong> type argument. It fills in <code>V</code>, so this task's <code>call()</code> returns an <code>Integer</code>. Generics only accept object types, so you write <code>Integer</code>, not <code>int</code>. Java converts between the two automatically, which is why <code>return n * n;</code> compiles (this is called autoboxing).</p>
+
+<h2>4 · <code>Future</code>: the result, later</h2>
+<p class="slides">Deck 2 · slides 50, 53–54, 65–66</p>
+
+<p><code>submit</code> returns a <code>Future</code>, a receipt for a result that may not exist yet. <code>future.get()</code> <strong>waits</strong> until the task has finished, then returns what <code>call()</code> returned (slide 50):</p>
+
+<pre>Future&lt;Integer&gt; f = pool.submit(new Square(6));
+int r = f.get();   // waits, like join(); r = 36</pre>
+
+<p><code>get()</code> can throw two checked exceptions. <code>InterruptedException</code> is the same as <code>join()</code>'s. <code>ExecutionException</code> wraps any exception that <code>call()</code> threw in the pool thread, so the error reaches <code>main</code>. The slides catch both and do nothing, which hides errors; writing <code>throws Exception</code> on <code>main</code> is simpler and shows them.</p>
+
+<p>Here is everything you knew from lessons 1 and 4, next to its replacement:</p>
+<div class="table-wrap"><table>
+<tr><th>Lessons 1 and 4</th><th>With a pool</th></tr>
+<tr><td><code>class Summer extends Thread</code></td><td><code>class Sum implements Callable&lt;Long&gt;</code></td></tr>
+<tr><td><code>run()</code> stores a <code>result</code> field</td><td><code>call()</code> returns the result</td></tr>
+<tr><td><code>new Summer(…).start()</code></td><td><code>pool.submit(new Sum(…))</code></td></tr>
+<tr><td><code>w.join()</code> then <code>w.getResult()</code></td><td><code>f.get()</code> does both</td></tr>
+<tr><td>threads end on their own</td><td><code>pool.shutdown()</code></td></tr>
+</table></div>
+
+<h2>5 · Sum with a pool</h2>
+<p class="slides">Deck 2 · slides 67–72</p>
+
+<p>Slides 67–72 are lesson 4's fair split rewritten with these replacements. Slide 68 is the same <code>j*N/k</code> formula. Slide 69 submits one <code>Sum</code> per segment and keeps every <code>Future</code> in an <code>ArrayList</code>. Slide 70 calls <code>get()</code> on each one. It's the same shape as lesson 1: submit all, then get all.</p>
+
+<div class="callout warn">
+<p>Calling <code>get()</code> right after each <code>submit()</code>, inside the same loop, makes the program serial: <code>main</code> waits for task 0 before submitting task 1. This is the same mistake as <code>start(); join();</code> in one loop.</p>
+</div>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">You want each task to send back a number. Which interface do you implement?</p>
+<div class="options">
+<button class="opt" data-correct><code>Callable&lt;Integer&gt;</code></button>
+<button class="opt"><code>Runnable</code></button>
+<button class="opt"><code>Future&lt;Integer&gt;</code></button>
+<button class="opt"><code>ExecutorService</code></button>
+</div>
+<p class="why"><code>Callable</code>'s <code>call()</code> returns a value. <code>Runnable</code>'s <code>run()</code> is <code>void</code>. A <code>Future</code> is what you get back from <code>submit</code>, and <code>ExecutorService</code> is the pool itself.</p>
+</div>
+
+<div class="quiz">
+<p class="q">A program submits its tasks, prints every result, but never calls <code>shutdown()</code>. What happens?</p>
+<div class="options">
+<button class="opt" data-correct>prints, then never exits</button>
+<button class="opt">exits normally when done</button>
+<button class="opt">the tasks never get to run</button>
+<button class="opt">it throws an exception</button>
+</div>
+<p class="why">The pool's threads stay alive, waiting for more tasks, and the JVM waits for them. Everything runs and prints correctly; the program just never ends.</p>
+</div>
+
+<div class="quiz">
+<p class="q">What does <code>future.get()</code> do if the task hasn't finished yet?</p>
+<div class="options">
+<button class="opt" data-correct>waits until it finishes</button>
+<button class="opt">returns null immediately</button>
+<button class="opt">returns 0 immediately</button>
+<button class="opt">throws an exception</button>
+</div>
+<p class="why">Slide 50: get waits if necessary for the computation to complete, then retrieves its result. That's why it replaces both <code>join()</code> and <code>getResult()</code>.</p>
+</div>
+
+<div class="quiz">
+<p class="q">A pool of 2 threads gets 4 submitted tasks (slides 52–55). How many threads does it create?</p>
+<div class="options">
+<button class="opt" data-correct>2, which take turns</button>
+<button class="opt">4, one per task</button>
+<button class="opt">6, pool plus tasks</button>
+<button class="opt">1, the main thread</button>
+</div>
+<p class="why">A fixed pool has exactly the number of threads you asked for. Tasks 3 and 4 wait in the queue until a thread finishes its first task and comes back for another.</p>
+</div>
+
+<div class="quiz">
+<p class="q">A task's <code>call()</code> divides by zero. Where does <code>main</code> see the error?</p>
+<div class="options">
+<button class="opt" data-correct>from get(), wrapped</button>
+<button class="opt">from submit(), directly</button>
+<button class="opt">from shutdown(), later</button>
+<button class="opt">nowhere, it is lost</button>
+</div>
+<p class="why"><code>get()</code> throws an <code>ExecutionException</code> whose cause is the <code>ArithmeticException</code> (checked on Java 26). With the slides' empty <code>catch</code> blocks, it would be silently lost.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0005/PoolSum.java"><code>lessons/code/0005/PoolSum.java</code></a>. The <code>Sum</code> task (slides 71–72) and lesson 4's boundaries are already written. Fill in the three <code>TODO</code>s in <code>main</code>, then run:</p>
+<pre class="language-bash">cd lessons/code/0005
+java PoolSum.java</pre>
+<p>Run it unchanged first. It reports that the pool is still running and stops itself, so you don't have to kill a hung program. Your goal is <code>PASS</code>.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>TODO 1: <code>pool.submit(...)</code> returns a <code>Future&lt;Long&gt;</code>; pass it to <code>futures.add(...)</code>. Segment j is <code>index[j]</code> to <code>index[j + 1]</code>. TODO 2 is one <code>+=</code>. TODO 3 is one method call.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Delete TODO 3's line, and also the <code>isShutdown</code> check, then run it. What does the terminal do after printing? (b) Make the pool <code>newFixedThreadPool(1)</code>. Is the answer still right? Is it still parallel?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>futures.add(pool.submit(          // TODO 1
+    new Sum(data, index[j], index[j + 1])));
+
+total += f.get();                 // TODO 2
+
+pool.shutdown();                  // TODO 3</pre>
+<p><code>List&lt;Future&lt;Long&gt;&gt; futures = new ArrayList&lt;&gt;()</code> is a growable list of Futures; the empty <code>&lt;&gt;</code> lets Java fill in the type. (a) It prints the total and then hangs; press Ctrl+C. (b) The answer is right, but one thread runs all the tasks one after another, so nothing is parallel.</p>
+</details>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> Oracle's Java Tutorial, three short pages: <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/executors.html">Executors</a> → <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/exinter.html">Executor Interfaces</a> → <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/pools.html">Thread Pools</a>. About 10 minutes. Then reread <strong>Deck 2, slides 61–72</strong> with this lesson's table beside you.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Write the four lines that create a pool, submit a <code>Callable</code>, get its result and stop the pool.</summary><pre>ExecutorService pool = Executors.newFixedThreadPool(k);
+Future&lt;Integer&gt; f = pool.submit(new Square(6));
+int r = f.get();
+pool.shutdown();</pre></details>
+<details class="recall"><summary><code>Runnable</code> vs <code>Callable</code> in one line.</summary><p><code>Runnable.run()</code> returns nothing and can't throw checked exceptions; <code>Callable.call()</code> returns a value and can.</p></details>
+<details class="recall"><summary>Boundaries for N = 10, k = 4. (lesson 4)</summary><p>0, 2, 5, 7, 10, from <code>j * N / k</code>.</p></details>
+
+<div class="next"><a href="0004-fair-splitting.html">← Lesson 4: fair splitting</a><a href="0006-uneven-work.html">Lesson 6: uneven work →</a></div>
+
+<footer class="ask">Generics or the exception syntax still confusing, or want a Runnable version to compare? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>
