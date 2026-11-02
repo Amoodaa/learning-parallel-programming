@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lock-Free Data Structures</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 19 of 19 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Lock-Free Data Structures</h1>
+<p class="subtitle">Thread safety without locks: try the update, and if another thread got there first, try again. It's all built on one hardware instruction, compare-and-swap.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll make a stack that 4 threads push and pop at the same time, using no locks at all. About 25 minutes.</p>
+
+<p>Deck 7 (Non-Blocking Lock-Free Data Structures) questions everything since lesson 8. Every tool so far, <code>synchronized</code>, <code>ReentrantLock</code>, conditions and semaphores, makes a thread <em>wait</em>. This deck makes threads <em>retry</em> instead. You've already used one result of it: the tunnel's <code>AtomicInteger</code> in lesson 15.</p>
+
+<h2>1 · Pessimistic vs optimistic</h2>
+<p class="slides">Deck 7 · slides 2–8</p>
+
+<p>Two definitions to learn word for word (slide 2):</p>
+<ul>
+<li><strong>Non-blocking:</strong> if one thread fails or is suspended, that does not cause another thread to fail or be suspended.</li>
+<li><strong>Lock-free:</strong> at each step, some thread can make progress.</li>
+</ul>
+<p>A lock breaks both. If the thread holding it is paused, everyone waiting for it is stuck. Locking is <strong>pessimistic</strong> (slide 3): it always locks, even when no other thread would have interfered, and that costs time. The <strong>optimistic</strong> approach (slide 4) does the update anyway and then <strong>detects a collision</strong>: if another thread changed the data meanwhile, the update fails and the thread retries. Slide 5's argument: contention is usually low, so the update usually succeeds the first time. And when several threads do collide, one of them always wins, so something always makes progress.</p>
+<p>Slide 6 reports Goetz's experiment with a random number generator built both ways. Under <strong>very high</strong> contention, locks did better, because the retries wasted time. At <strong>realistic</strong> contention, atomic variables did better.</p>
+
+<div class="table-wrap"><table>
+<tr><th>Advantages (slide 7)</th><th>Disadvantages (slide 8)</th></tr>
+<tr><td>No locks, so no deadlock</td><td>Under contention, threads busy-wait (retry), which can cause liveness problems</td></tr>
+<tr><td>Fast when threads use different parts of the structure</td><td>Retrying uses a lot of CPU time</td></tr>
+<tr><td>Same visibility as <code>volatile</code>, plus atomic updates</td><td>Difficult to code</td></tr>
+<tr><td>No priority inversion</td><td>Needs hardware support (CAS)</td></tr>
+</table></div>
+<p><strong>Priority inversion</strong> is when a high-priority thread waits for a lock held by a low-priority thread, so in effect it runs at the low priority. Without locks there's nothing to wait on, so it can't happen.</p>
+
+<h2>2 · Compare-and-swap (CAS)</h2>
+<p class="slides">Deck 7 · slides 9–13</p>
+
+<p>CAS is a single, atomic hardware instruction (slide 9). It says: "if the variable still holds the value I expect, set it to the new value; otherwise, don't touch it and tell me I failed" (slide 10):</p>
+<pre>// cas(memWord, expectValue, newValue), all one atomic step
+if (memWord == expectValue) {
+    memWord = newValue;
+    return true;
+} else return false;</pre>
+<p>Because it can fail, it's always used in a <strong>retry loop</strong> (slides 11–12). Read the current value, compute the new one, and try to swap it in. If another thread changed the variable meanwhile, the CAS fails, so you read again and recompute:</p>
+<pre>int x0, x1;
+do {
+    x0 = x;              // read
+    x1 = x0 + k;         // compute (the "speculative" step)
+} while (!cas(x, x0, x1));   // swap in; retry if x changed</pre>
+<p>Compare lesson 8's lost update: <code>x = x + 1</code> lost updates because another thread could write between the read and the write. CAS doesn't prevent that write. It <strong>detects</strong> it and refuses to overwrite. (Slide 12 is missing a <code>)</code> after <code>cas(x,x0,x1)</code>.) In Java, CAS is <code>compareAndSet(expected, update)</code> (slide 13).</p>
+
+<h2>3 · The atomic classes</h2>
+<p class="slides">Deck 7 · slides 14–24</p>
+
+<p><code>java.util.concurrent.atomic</code> has <code>AtomicInteger</code>, <code>AtomicLong</code>, <code>AtomicBoolean</code> and <code>AtomicReference&lt;V&gt;</code> (slide 14). All four have <code>get</code>, <code>set</code>, <code>getAndSet</code> and <code>compareAndSet</code> (slides 16–18). The number classes add ready-made retry loops (slide 15):</p>
+<pre>AtomicInteger n = new AtomicInteger(0);
+n.incrementAndGet();  // ++n atomically; returns new value
+n.getAndIncrement();  // n++ atomically; returns old value
+n.decrementAndGet();  n.getAndDecrement();</pre>
+<p>Slide 19's <code>Counter</code> is lesson 8's counter with no <code>synchronized</code> at all. Slides 20–22 write <code>inc()</code> by hand with <code>compareAndSet</code>, the loop from section 2, to show what <code>incrementAndGet</code> does inside. (Slide 20 never creates the <code>AtomicInteger</code>: <code>private AtomicInteger value;</code> is <code>null</code>, so the first call throws a <code>NullPointerException</code>. It needs <code>= new AtomicInteger(0)</code>.)</p>
+
+<p>The limit (slides 18 and 24): an atomic class makes <strong>one variable</strong> safe. It <strong>cannot keep an invariant between two variables</strong> (lesson 8's <code>x == y</code>, or a stack's array and its <code>size</code>), because each CAS covers only one variable. Slide 24 also warns: atomic classes are mutable, so don't use them as replacements for <code>Integer</code>, or in anything used for hash codes.</p>
+
+<h2>4 · Two stacks</h2>
+<p class="slides">Deck 7 · slides 25–35</p>
+
+<p><strong>The spin-lock stack</strong> (slides 25–29). An array stack has an invariant between <code>stack[]</code> and <code>size</code>, which one CAS can't cover. Slide 26 builds a lock out of an <code>AtomicBoolean</code>:</p>
+<pre>while (true) {
+    if (lock.compareAndSet(false, true)) {   // got it
+        // ... push using stack[] and size ...
+        lock.set(false);                     // release
+        return true;
+    }   // else: loop and try again ("spin")
+}</pre>
+<p>Only one thread can switch <code>false</code> to <code>true</code>, so this is mutual exclusion. Be careful, though: <strong>it is still a lock</strong>. If the thread holding it is paused, every other thread spins forever. By slide 2's definition it is <em>not</em> non-blocking. It just waits by spinning instead of sleeping.</p>
+
+<p><strong>The lock-free linked stack</strong> (slides 30–35). Here the whole state is <strong>one reference</strong>, the <code>head</code> of a linked list, so CAS can protect it:</p>
+<pre>// push(item), slide 32
+Node newHead = new Node(item);
+do {
+    oldHead = head.get();
+    newHead.next = oldHead;
+} while (!head.compareAndSet(oldHead, newHead));
+
+// pop(), slide 33
+do {
+    oldHead = head.get();
+    if (oldHead == null) return null;     // empty
+    newHead = oldHead.next;
+} while (!head.compareAndSet(oldHead, newHead));
+return oldHead.item;</pre>
+<p>Each operation prepares the change privately, then swaps <code>head</code> in one CAS. If another thread moved <code>head</code> meanwhile, the CAS fails and the operation starts again with the new head. No thread ever waits for another, so this one really is lock-free. Slide 35 wraps it as a <code>Stack</code>. (Slide 34's <code>head()</code> calls <code>head.get().item</code>, which throws a <code>NullPointerException</code> on an empty stack.)</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q"><code>compareAndSet(5, 6)</code> is called, but the value is now 7. What happens?</p>
+<div class="options">
+<button class="opt" data-correct>nothing changes; it returns false</button>
+<button class="opt">the value becomes 6</button>
+<button class="opt">the thread blocks until the value is 5</button>
+<button class="opt">an exception is thrown</button>
+</div>
+<p class="why">CAS only writes if the current value equals the expected one. On failure it returns <code>false</code> and the caller decides what to do: usually re-read and retry.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Why is CAS almost always inside a loop?</p>
+<div class="options">
+<button class="opt" data-correct>another thread may change the value first, making it fail</button>
+<button class="opt">CAS only works on the second attempt</button>
+<button class="opt">to wait until the lock is free</button>
+<button class="opt">to make the update visible</button>
+</div>
+<p class="why">Failure means "someone else updated it since you read it". Re-read, recompute, and try again (slides 11–12).</p>
+</div>
+
+<div class="quiz">
+<p class="q">Why can't an <code>AtomicInteger</code> for <code>size</code> alone make an array stack thread-safe?</p>
+<div class="options">
+<button class="opt" data-correct>the invariant links size and the array; one CAS covers one variable</button>
+<button class="opt">AtomicInteger is not visible to other threads</button>
+<button class="opt">arrays can't be used with threads</button>
+<button class="opt">AtomicInteger has no decrement</button>
+</div>
+<p class="why">A push must write <code>stack[size]</code> <em>and</em> increment <code>size</code> as one action. Atomic classes "are not suitable to maintain state invariants" (slide 18). Hence the spin lock, or the linked list whose whole state is one reference.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Is slide 26's <code>AtomicBoolean</code> spin-lock stack non-blocking?</p>
+<div class="options">
+<button class="opt" data-correct>no: if the holder is suspended, the others spin forever</button>
+<button class="opt">yes: it uses compareAndSet, so it's lock-free</button>
+<button class="opt">yes: spinning isn't blocking</button>
+<button class="opt">no: AtomicBoolean uses a hidden lock</button>
+</div>
+<p class="why">Non-blocking means a suspended thread can't stop others (slide 2). A spin lock is still a lock: it waits by spinning instead of sleeping. The linked stack is different, because no thread ever waits for another.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0019/LockFreeStack.java"><code>lessons/code/0019/LockFreeStack.java</code></a>. <code>push</code> and <code>pop</code> currently do a plain <code>get</code> then <code>set</code> on <code>head</code>. Rewrite both as compare-and-set loops, then run:</p>
+<pre class="language-bash">cd lessons/code/0019
+java LockFreeStack.java</pre>
+<p>4 threads each push 100,000 distinct numbers, popping along the way, and then empty the stack. <code>PASS</code> needs every number popped exactly once: none lost, none popped twice. Unchanged, a large share of the numbers are lost or popped twice.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>Section 4's code, adapted: <code>Node</code> here is immutable (<code>final</code> fields), so build <code>new Node&lt;&gt;(x, oldHead)</code> inside the loop. In <code>pop</code>, check for <code>null</code> inside the loop, because the stack can become empty between tries.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Fix <code>push</code> but leave <code>pop</code> as it was. Does the checker see the difference? (b) Without running anything: why would a <code>synchronized</code> stack also pass, and what would it lose?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>void push(E x) {
+    Node&lt;E&gt; oldHead, newHead;
+    do {
+        oldHead = head.get();
+        newHead = new Node&lt;&gt;(x, oldHead);
+    } while (!head.compareAndSet(oldHead, newHead));
+}
+
+E pop() {
+    Node&lt;E&gt; oldHead;
+    do {
+        oldHead = head.get();
+        if (oldHead == null) return null;
+    } while (!head.compareAndSet(oldHead, oldHead.next));
+    return oldHead.item;
+}</pre>
+<p>(a) Yes. In my runs over 100,000 numbers were still popped twice: two threads read the same head and both "popped" it. (b) A lock makes it correct too, but it's then blocking: a paused thread holding the lock stops everyone, and every operation pays for locking even when there's no contention (slide 3).</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Explain compare-and-swap and show how it implements a thread-safe counter without locks. (5 marks)</summary>
+<p>CAS(location, expected, new) is an atomic hardware instruction. If the location holds <code>expected</code>, it writes <code>new</code> and returns true; otherwise it changes nothing and returns false. Counter increment: read the current value <code>v</code>, then attempt <code>compareAndSet(v, v + 1)</code>. If it fails, another thread updated the counter in between, so read <code>v</code> again and retry, until it succeeds. No update is lost, because a CAS based on a stale value always fails. No thread ever blocks, and among contending threads one CAS always succeeds, so the counter is lock-free.</p></details>
+<details class="recall"><summary>Give two advantages and two disadvantages of lock-free data structures compared with locking. (4 marks)</summary>
+<p>Advantages: no deadlock, because there are no locks; no priority inversion; high performance at realistic contention and when threads access different items; a suspended thread can't block the others. Disadvantages: under high contention threads retry repeatedly, which wastes CPU and can cause liveness problems; they are hard to write correctly; they need hardware CAS; atomic variables cover only single variables, not invariants.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> Oracle's <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/atomicvars.html">Atomic Variables</a> page. About 5 minutes. It turns lesson 8's synchronized counter into an <code>AtomicInteger</code> one, like slide 19. Slides 5–6 come from Goetz, <em>Java Concurrency in Practice</em>, ch. 15, which is on the course reading list (Deck 1 slide 2).</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Write the CAS retry loop for <code>x += k</code>.</summary><pre>int v;
+do { v = n.get(); }
+while (!n.compareAndSet(v, v + k));</pre></details>
+<details class="recall"><summary>Define non-blocking and lock-free (slide 2).</summary><p>Non-blocking: the failure or suspension of one thread can't cause the failure or suspension of another. Lock-free: at each step some thread can make progress.</p></details>
+<details class="recall"><summary>Why must a semaphore-based buffer still use a lock around the list? (lesson 15)</summary><p>The semaphores only count slots and items. Several producers (or consumers) can hold permits at once and would change the <code>ArrayList</code> at the same time.</p></details>
+
+<div class="next"><a href="0018-queues-and-pools.html">← Lesson 18: queues and pools</a><a href="../reference/course-map.html">Course map →</a></div>
+
+<footer class="ask">That's all seven decks. Want a mixed revision quiz across the condition-variable, semaphore and lock-free lessons? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

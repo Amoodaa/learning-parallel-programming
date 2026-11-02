@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Condition Variables</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 12 of 19 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Condition Variables</h1>
+<p class="subtitle">A lock lets one thread in at a time. A condition variable lets a thread wait inside the lock until something is true, such as "the buffer isn't full".</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll write a bounded buffer that 4 producers and 4 consumers share without losing an item or hanging. About 25 minutes.</p>
+
+<p>Deck 4 (Condition Variables) starts where Deck 3 stopped. Lessons 8–11 made threads take turns. Now a thread sometimes can't go ahead even when it has the lock: the garden is full, or the buffer is empty. Slides 2–16 show the tool for that and use it three times. The rest of the deck (lessons 13–14) applies it to classic problems.</p>
+
+<h2>1 · Sharing a <em>limited</em> resource</h2>
+<p class="slides">Deck 4 · slides 2–4</p>
+
+<p>Slide 2 sums up the course so far: one lock can share one resource, and several locks can share several. The new question: how do you share a resource that is only available <strong>under some condition</strong>? Slide 3 gives real examples: a stadium, a restaurant or a bus has a fixed number of places. Slide 4 lists the problems the deck solves, the producer/consumer buffer, dining philosophers and readers/writers.</p>
+
+<p>The difficulty: suppose the garden is full. The visitor thread has to wait, but it holds the lock, so nobody can leave and make room. It has to <strong>give the lock up while it waits</strong>, and take it back afterwards.</p>
+
+<h2>2 · <code>await</code> and <code>signal</code></h2>
+<p class="slides">Deck 4 · slides 5–6</p>
+
+<p>A condition variable belongs to a <code>Lock</code> (lesson 11). You can make several for one lock, one per thing you might wait for:</p>
+<pre>Condition notFull = lock.newCondition();
+
+notFull.await();      // release the lock and sleep
+notFull.signal();     // wake one thread waiting here
+notFull.signalAll();  // wake all of them</pre>
+<ul>
+<li><code>await()</code> releases the lock and puts the thread to sleep in one step. When the thread is woken it has to <strong>take the lock back</strong> before <code>await()</code> returns, so it still holds the lock afterwards.</li>
+<li><code>signal()</code> wakes one waiting thread, if there is one. If none is waiting, the signal does nothing and is not saved for later.</li>
+<li>You must hold the lock to call <code>await</code> or <code>signal</code>. Otherwise Java throws <code>IllegalMonitorStateException</code>.</li>
+</ul>
+
+<p>Slide 6's rule: <strong>always call <code>await</code> in a <code>while</code> loop, never an <code>if</code></strong>. Between being woken and getting the lock back, another thread can get in first and use up the space. So when you get the lock back, the condition may be false again:</p>
+<pre>while (count == max) {      // re-check after every wake-up
+    try { notFull.await(); }
+    catch (InterruptedException e) {}
+}
+count++;                    // now count &lt; max for sure</pre>
+<span class="sidenote">A second reason the slides don't give: the <code>Condition</code> Javadoc allows a "spurious wakeup", where a thread returns from <code>await()</code> without any signal. The <code>while</code> loop covers that too. <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/Condition.html">Condition</a></span>
+
+<h2>3 · A garden and a set of ports</h2>
+<p class="slides">Deck 4 · slides 7–12</p>
+
+<p>Slides 7–9 return to Deck 3's garden (slides 98–101), now with at most <code>max</code> visitors. <code>T1()</code> is one turnstile: lock, wait on <code>notFull</code> while <code>count == max</code>, then <code>count++</code>. <code>leave()</code> does <code>count--</code> and signals <code>notFull</code>. Slide 9 is the visitor thread: it enters through a random turnstile, sleeps, then leaves. (Slide 9 is missing <code>()</code> after <code>garden.T1</code>, and <code>T2</code> is never shown. It is the same as <code>T1</code>.)</p>
+
+<p>Slides 10–12 manage 10 network ports with the same pattern. <code>getPort()</code> waits while <code>available == 0</code>, then finds a free port, marks it used and returns its number. <code>freePort(k)</code> marks it free, does <code>available++</code> and signals. Every lesson in this deck repeats this shape:</p>
+<pre>lock.lock();
+try {
+    while (!canGo) cond.await();  // wait for the condition
+    // change the state
+    other.signal();               // tell whoever waits on it
+} finally { lock.unlock(); }</pre>
+
+<h2>4 · Producer/consumer</h2>
+<p class="slides">Deck 4 · slides 13–16</p>
+
+<p>Slide 13 states the classic problem. A producer puts items into a fixed-size buffer and a consumer takes them out. If the buffer is full the producer sleeps until there's space, and if it's empty the consumer sleeps until there's an item. That keeps a fast producer from getting ahead of a slow consumer.</p>
+
+<p>Slides 14–16 use <strong>two conditions on one lock</strong>: producers wait on <code>notFull</code> and consumers wait on <code>notEmpty</code>. <code>put</code> waits while <code>size == max</code>, adds the item, and signals <code>notEmpty</code>. <code>get</code> waits while <code>size == 0</code>, removes the oldest item, and signals <code>notFull</code>. Each method wakes the threads waiting on the <em>other</em> side.</p>
+
+<div class="callout warn">
+<p><strong>Slide bug.</strong> Slide 15 signals only when the buffer has just stopped being empty: <code>if(size - 1 == 0) notEmpty.signal();</code>. Slide 16 has the same check for full. That works for one producer and one consumer. With more, a thread can be left asleep even though the buffer has an item for it:</p>
+<ol>
+<li>Consumers C1 and C2 both wait on an empty buffer.</li>
+<li>A producer puts an item. Size goes 0 → 1, so it signals, and C1 wakes up. C1 still has to get the lock back.</li>
+<li>Before C1 gets the lock, a producer puts again. Size goes 1 → 2, which isn't the "was empty" case, so there's no signal.</li>
+<li>C1 takes one item. One item is left, but C2 is still asleep and nothing will wake it.</li>
+</ol>
+<p>With 4 producers and 4 consumers, the slides' version hung in 20 runs out of 20 on my machine. The fix: <strong>signal on every <code>put</code> and every <code>get</code></strong>. A signal with no thread waiting costs almost nothing.</p>
+</div>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">What happens to the lock when a thread calls <code>cond.await()</code>?</p>
+<div class="options">
+<button class="opt" data-correct>it's released, and taken back before await returns</button>
+<button class="opt">the thread keeps holding it while it sleeps</button>
+<button class="opt">it's released for good; you must lock again</button>
+<button class="opt">nothing; await doesn't involve the lock</button>
+</div>
+<p class="why">Releasing the lock is the point: otherwise no thread could change the condition. And because <code>await()</code> takes the lock back before returning, the code after it is still inside the lock.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Why <code>while (size == max) notFull.await();</code> rather than <code>if</code>?</p>
+<div class="options">
+<button class="opt" data-correct>the condition may be false again once you get the lock back</button>
+<button class="opt">await() only waits for a fixed time</button>
+<button class="opt">a while loop is faster than an if</button>
+<button class="opt">so the thread can signal itself</button>
+</div>
+<p class="why">Another thread can take the space between the signal and your re-locking (slide 6). Spurious wakeups are a second reason. Re-check every time.</p>
+</div>
+
+<div class="quiz">
+<p class="q">In the bounded buffer, which condition should <code>get()</code> signal after removing an item?</p>
+<div class="options">
+<button class="opt" data-correct>notFull</button>
+<button class="opt">notEmpty</button>
+<button class="opt">both, always</button>
+<button class="opt">neither; put() does all the signalling</button>
+</div>
+<p class="why">Removing an item makes space, and producers are the ones waiting for space, on <code>notFull</code>. Each side signals the condition the <em>other</em> side waits on.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Nobody is waiting on <code>notEmpty</code> and a producer calls <code>notEmpty.signal()</code>. What happens?</p>
+<div class="options">
+<button class="opt" data-correct>nothing; the signal is not saved</button>
+<button class="opt">the next consumer to wait wakes straight away</button>
+<button class="opt">an exception is thrown</button>
+<button class="opt">the producer blocks until someone waits</button>
+</div>
+<p class="why">A signal only wakes threads that are already waiting. That's why the waiting side checks the state (<code>size == 0</code>) instead of relying on having heard a signal, and why signalling every time is cheap.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0012/BoundedBuffer.java"><code>lessons/code/0012/BoundedBuffer.java</code></a>. The lock and both conditions are declared for you. Write <code>put</code> and <code>get</code>, then run:</p>
+<pre class="language-bash">cd lessons/code/0012
+java BoundedBuffer.java</pre>
+<p>4 producers each put 20,000 numbers into a buffer of size 3, and 4 consumers take them out. <code>PASS</code> means every number arrived exactly once, the buffer never held more than 3, and nobody hung. If a thread waits forever, the program notices after 10 seconds and reports it.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>Use the shape from section 3. In <code>put</code>: <code>lock.lock()</code>, then <code>try</code>, then <code>while (items.size() == max)</code> await <code>notFull</code>, then <code>items.add(x)</code> and <code>notEmpty.signal()</code>, then <code>finally { lock.unlock(); }</code>. <code>get</code> is the mirror image: <code>items.remove(0)</code> returns the oldest item.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Change <code>put</code> to signal only when the buffer was empty, as slide 15 does (<code>if (items.size() == 1)</code>). Run it a few times. (b) Change a <code>while</code> to an <code>if</code>. Does the checker catch it?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>void put(E x) {
+    lock.lock();
+    try {
+        while (items.size() == max) {
+            try { notFull.await(); }
+            catch (InterruptedException e) {}
+        }
+        items.add(x);
+        notEmpty.signal();
+    } finally { lock.unlock(); }
+}
+
+E get() {
+    lock.lock();
+    try {
+        while (items.isEmpty()) {
+            try { notEmpty.await(); }
+            catch (InterruptedException e) {}
+        }
+        E x = items.remove(0);
+        notFull.signal();
+        return x;
+    } finally { lock.unlock(); }
+}</pre>
+<p>(a) It hangs, and the checker reports "still running after 10 s". (b) It fails at once. In my runs, consumers crashed with <code>IndexOutOfBoundsException</code> because they woke up, didn't re-check, and removed from an empty list. Producers overfilled the buffer the same way. That is slide 6's scenario: another thread got the lock first and used up what the signal was for.</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Explain why a call to <code>await()</code> on a condition variable must be enclosed in a <code>while</code> loop. (3 marks)</summary>
+<p>A signalled thread does not continue immediately. It must first reacquire the lock, and it may lose that race to another thread (slide 6). That thread can change the state, for example by filling the space that was freed, so the condition that caused the signal may no longer hold. The waiting thread must therefore test the condition again after every wake-up and wait again if it is false. A <code>while</code> loop does this. It also handles spurious wakeups.</p></details>
+<details class="recall"><summary>Describe the producer/consumer problem and how two condition variables solve it. (5 marks)</summary>
+<p>A producer and a consumer share a fixed-size buffer. The producer must not add to a full buffer, and the consumer must not take from an empty one. Each must sleep until the other changes the state (slide 13). Solution: one lock protects the buffer, with two conditions on it. <code>put</code> waits on <code>notFull</code> while the buffer is full, adds, then signals <code>notEmpty</code>. <code>get</code> waits on <code>notEmpty</code> while it is empty, removes, then signals <code>notFull</code>. Waiting releases the lock, so the other side can make progress. The waits are in <code>while</code> loops, and the buffer updates happen under the lock, so they are atomic.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> the <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/Condition.html"><code>Condition</code> Javadoc</a>. Its example is the same bounded buffer with <code>notFull</code> and <code>notEmpty</code>, and it signals on every put and take. About 5 minutes.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Write the wait-for-a-condition pattern with a lock.</summary><pre>lock.lock();
+try {
+    while (!canGo) cond.await();
+    // change state, then signal
+} finally { lock.unlock(); }</pre></details>
+<details class="recall"><summary>Why can signalling only on the "was empty" step hang a buffer with several consumers?</summary><p>Two puts can happen before the first woken consumer gets the lock back. Only the first put signals, so a second waiting consumer sleeps while an item is in the buffer.</p></details>
+<details class="recall"><summary>What does <code>tryLock()</code> do, and which deadlock condition does it break? (lesson 11)</summary><p>It takes the lock if it's free and returns <code>false</code> immediately if not. A thread never waits while holding a lock, so it breaks hold and wait.</p></details>
+
+<div class="next"><a href="0011-deadlock-and-lock.html">← Lesson 11: deadlock and Lock</a><a href="0013-philosophers-and-readers.html">Lesson 13: philosophers and readers →</a></div>
+
+<footer class="ask">Want a runnable version of the ports or the garden with a limit? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

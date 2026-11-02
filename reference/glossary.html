@@ -50,7 +50,7 @@
 <dd><code>Thread.sleep(ms)</code>: pauses the <em>current</em> thread for a time. Static, whatever object you call it on.</dd>
 
 <dt>Interrupt</dt>
-<dd>A signal from one thread asking another to stop what it's doing. A sleeping thread receives it as an <code>InterruptedException</code>.</dd>
+<dd>A signal from one thread asking another to stop what it's doing: <code>t.interrupt()</code>. A sleeping, joining or awaiting thread receives it as an <code>InterruptedException</code>; a running one must poll <code>isInterrupted()</code> (D4 s40–42, <a href="../lessons/0014-interrupts-and-signals.html">lesson 14</a>).</dd>
 
 <dt>Thread state</dt>
 <dd>One of <code>NEW</code>, <code>RUNNABLE</code>, <code>BLOCKED</code>, <code>WAITING</code>, <code>TIMED_WAITING</code>, <code>TERMINATED</code>, returned by <code>getState()</code>.</dd>
@@ -166,6 +166,63 @@
 
 <dt><code>ReentrantLock</code></dt>
 <dd>An explicit lock: <code>lock()</code>, then <code>try { … } finally { unlock(); }</code>. Same guarantees as <code>synchronized</code>, plus <code>tryLock()</code> and an optional fair mode (D3 s77–88).</dd>
+</dl>
+
+<h2>Waiting &amp; signalling</h2>
+<dl>
+<dt>Condition variable</dt>
+<dd>A queue of threads waiting, inside a lock, for some state to become true. <code>lock.newCondition()</code>; <code>await()</code> releases the lock and sleeps; <code>signal()</code>/<code>signalAll()</code> wake one/all (D4 s5). <a href="../lessons/0012-condition-variables.html">Lesson 12</a>.</dd>
+
+<dt>Producer/consumer</dt>
+<dd>Producers add to and consumers take from a fixed-size buffer; producers wait while it's full, consumers while it's empty (D4 s13).</dd>
+
+<dt>Dining philosophers</dt>
+<dd>Five philosophers, five chopsticks, each needs two: the classic deadlock example. Fixed by letting at most n−1 try at once (D4 s17–31). <a href="../lessons/0013-philosophers-and-readers.html">Lesson 13</a>.</dd>
+
+<dt>Readers/writers</dt>
+<dd>Many readers may share the data; a writer needs it alone. The slides' version gives writers precedence (D4 s32).</dd>
+
+<dt>Semaphore</dt>
+<dd>A counter of permits: <code>acquire()</code> takes one or blocks at 0; <code>release()</code> adds one. Any thread may release (D5 s2–3). <a href="../lessons/0015-semaphores.html">Lesson 15</a>.</dd>
+
+<dt>Binary semaphore</dt>
+<dd>A semaphore starting at 1, used as a lock (D5 s3).</dd>
+
+<dt>Rendezvous</dt>
+<dd>Two threads each wait until the other reaches a point; two semaphores at 0, each thread releases its own then acquires the other's (D5 s10).</dd>
+
+<dt><code>CountDownLatch</code></dt>
+<dd>A one-use gate: <code>await()</code> blocks until <code>countDown()</code> has been called the starting number of times (D6 s2). <a href="../lessons/0017-latches-and-barriers.html">Lesson 17</a>.</dd>
+
+<dt><code>CyclicBarrier</code></dt>
+<dd>A reusable meeting point: each of n threads' <code>await()</code> blocks until all n arrive; optional barrier action runs once per trip (D6 s9, s15).</dd>
+
+<dt><code>ArrayBlockingQueue</code></dt>
+<dd>A ready-made bounded buffer: <code>put</code> waits while full, <code>take</code> while empty (D6 s23–24). <a href="../lessons/0018-queues-and-pools.html">Lesson 18</a>.</dd>
+
+<dt>Sentinel</dt>
+<dd>A special value put in a queue to tell a consumer "no more work, stop"; one per consumer (D6 s30).</dd>
+</dl>
+
+<h2>Lock-free</h2>
+<dl>
+<dt>Non-blocking</dt>
+<dd>Failure or suspension of one thread can't cause failure or suspension of another (D7 s2). <a href="../lessons/0019-lock-free.html">Lesson 19</a>.</dd>
+
+<dt>Lock-free</dt>
+<dd>At each step some thread can make progress (D7 s2).</dd>
+
+<dt>Compare-and-swap (CAS)</dt>
+<dd>One atomic instruction: if a location holds the expected value, write the new one and return true; otherwise return false. In Java, <code>compareAndSet</code> (D7 s9–13).</dd>
+
+<dt>Atomic classes</dt>
+<dd><code>AtomicInteger</code>, <code>AtomicLong</code>, <code>AtomicBoolean</code>, <code>AtomicReference</code>: one variable with <code>volatile</code> visibility plus atomic updates; no invariants across variables (D7 s14–18).</dd>
+
+<dt>Spin lock</dt>
+<dd>A lock taken by looping on <code>compareAndSet(false, true)</code> until it succeeds. Still a lock: not non-blocking (D7 s26).</dd>
+
+<dt>Priority inversion</dt>
+<dd>A high-priority thread stuck waiting for a lock held by a low-priority one. Lock-free code avoids it (D7 s7).</dd>
 </dl>
 </main>
 </body>

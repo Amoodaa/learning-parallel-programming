@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semaphore Puzzles</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 16 of 19 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Semaphore Puzzles</h1>
+<p class="subtitle">Three bigger problems built from lesson 15's patterns: an output-ordering puzzle, a first-come-first-served queue, and a resource allocator.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll make three threads print a's, b's and c's in an order that obeys three rules, using only semaphores. About 25 minutes.</p>
+
+<p>Deck 5 slides 24–45 are exam-style problems. Each is solved by combining lesson 15's three uses of a semaphore: signalling ("your turn"), counting ("one more available"), and a semaphore per thread to wake it at the right moment.</p>
+
+<h2>1 · The a/b/c puzzle</h2>
+<p class="slides">Deck 5 · slides 24–30</p>
+
+<p>TA prints <code>a</code> over and over, TB prints <code>b</code> and TC prints <code>c</code>. The output must satisfy (slide 24):</p>
+<ol>
+<li>a <code>b</code> is output before any <code>c</code>;</li>
+<li><code>b</code>'s and <code>c</code>'s alternate: b, c, b, c…;</li>
+<li>at every point, the number of <code>b</code>'s plus <code>c</code>'s so far is at most the number of <code>a</code>'s so far.</li>
+</ol>
+<p>So <code>abacabacaabc</code> is allowed, but <code>acb</code> breaks rule 1 and <code>aabcabc</code> breaks rule 3 (slide 25). The slides build the answer in two steps, one rule at a time.</p>
+
+<p><strong>Step 1: alternate b and c</strong> (slides 26–27). This is "taking turns", like a rendezvous that repeats. Two semaphores pass the turn back and forth:</p>
+<pre>// TB: semC.acquire(); print('b'); semB.release();
+// TC: semB.acquire(); print('c'); semC.release();</pre>
+<p>TB waits on <code>semC</code> ("c has just been printed"), so to let <code>b</code> go first (rule 1), <code>semC</code> must <strong>start at 1</strong> and <code>semB</code> at 0. The slides never show the starting values.</p>
+
+<p><strong>Step 2: count the a's</strong> (slides 28–30). TA releases <code>semA</code> after every <code>a</code>, so <code>semA</code> counts a's that haven't been "used" yet. TB and TC each acquire one before printing (slide 29), which enforces rule 3:</p>
+<pre>// TA: print('a'); semA.release();
+// TB: semC.acquire(); semA.acquire();
+//     print('b'); semB.release();</pre>
+<p>Slide 30 shows TB. TC is the mirror image and isn't shown.</p>
+
+<h2>2 · A queue of threads</h2>
+<p class="slides">Deck 5 · slides 31–35</p>
+
+<p>Threads should be let through <strong>in order of arrival</strong>. A plain semaphore makes no promise about which waiting thread a release wakes (slide 3 says "e.g., at random"). The trick (slide 31): <strong>every thread waits on its own semaphore</strong>, which starts at 0, and a queue remembers the order.</p>
+<pre>void join(Semaphore sem) {          // slide 32
+    lock.lock();
+    try { queue.add(sem); }          // remember my place
+    finally { lock.unlock(); }
+    sem.acquire();           // + try; wait for my turn
+}
+void next() {                        // slide 33
+    lock.lock();
+    try {
+        if (queue.size() &gt; 0) queue.poll().release();
+    } finally { lock.unlock(); }
+}</pre>
+<p>Because each thread has its own semaphore, <code>release()</code> wakes exactly the thread at the head of the queue. Notice that <code>join</code> unlocks <strong>before</strong> it calls <code>acquire()</code>. If it waited while holding the lock, <code>next()</code> could never get in to release it: slide 19's deadlock again. Slide 35's <code>main</code> starts 10 threads and calls <code>next()</code> once a second. (In <code>main</code>, the threads may join the queue in a different order from the order they were started, so "turn" numbers can come out of order.)</p>
+
+<h2>3 · A resource allocator</h2>
+<p class="slides">Deck 5 · slides 36–45</p>
+
+<p>There's a fixed number of identical resources. A client asks for <code>k</code> of them at once, gets all <code>k</code> together, and requests are served <strong>first come, first served</strong> (slide 36). It uses the thread queue's idea: each <code>Request</code> holds the number wanted and its client's own semaphore, and <code>allocate()</code> releases it (slide 37).</p>
+<ul>
+<li><code>getResources(req)</code> (slides 39–40): if the request is bigger than the total, it throws. If <strong>anyone is already queued</strong>, the request joins the queue even if there are enough resources free. Otherwise, if enough are free, they're granted straight away, and if not, it queues.</li>
+<li><code>returnResources(n)</code> (slides 41–42): add <code>n</code> back, then serve requests <strong>from the head of the queue</strong> while the head one fits.</li>
+<li>The client (slides 43–45) creates a request, calls <code>getResources</code>, then <code>acquire()</code>s its own semaphore. That returns at once if the request was granted, and otherwise waits until <code>returnResources</code> grants it.</li>
+</ul>
+<p>Why does a small request wait behind a big one, even when it would fit? That's what first come, first served means. If small requests could overtake, a large request might never collect enough resources: it would <strong>starve</strong>. The cost is that resources sit idle while the head of the queue waits.</p>
+<span class="sidenote">Two slide errors. Slide 39 declares <code>getResources(...) throws Exception</code>, but slide 44 calls it without a <code>try</code>/<code>catch</code>, so it won't compile. And slide 44 calls <code>resources.getMax()</code>, which slide 38's class doesn't define. It needs <code>int getMax() { return maxResources; }</code>.</span>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">In the a/b/c puzzle, what does <code>semA</code>'s count mean?</p>
+<div class="options">
+<button class="opt" data-correct>a's printed that no b or c has used yet</button>
+<button class="opt">whose turn it is</button>
+<button class="opt">the total number of a's printed</button>
+<button class="opt">how many threads are waiting</button>
+</div>
+<p class="why">TA adds one per <code>a</code>, and each <code>b</code> or <code>c</code> takes one. It can't go below 0, so b's + c's can never overtake the a's (rule 3).</p>
+</div>
+
+<div class="quiz">
+<p class="q">For <code>b</code> to come first, what must <code>semB</code> and <code>semC</code> start at? (TB waits on <code>semC</code>, TC on <code>semB</code>.)</p>
+<div class="options">
+<button class="opt" data-correct>semC = 1, semB = 0</button>
+<button class="opt">semB = 1, semC = 0</button>
+<button class="opt">both 1</button>
+<button class="opt">both 0</button>
+</div>
+<p class="why">TB needs a permit on <code>semC</code> to print the first <code>b</code>. Both 0 would deadlock, and both 1 would let a <code>c</code> out first.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Why does the thread queue give each thread its own semaphore, instead of all waiting on one?</p>
+<div class="options">
+<button class="opt" data-correct>so next() can wake one specific thread: the head of the queue</button>
+<button class="opt">a semaphore can only have one waiting thread</button>
+<button class="opt">to avoid needing a lock</button>
+<button class="opt">so threads can release each other</button>
+</div>
+<p class="why">A release on a shared semaphore wakes some waiting thread, with no guaranteed order. Releasing the head's own semaphore picks exactly who goes next, which gives arrival order.</p>
+</div>
+
+<div class="quiz">
+<p class="q">The allocator has 5 free. The head of the queue wants 8, and a new request wants 2. What happens to the new request?</p>
+<div class="options">
+<button class="opt" data-correct>it joins the queue behind the 8</button>
+<button class="opt">it is granted 2 immediately</button>
+<button class="opt">it throws an exception</button>
+<button class="opt">it takes 2, and the 8 gets 3 now</button>
+</div>
+<p class="why">If anyone is queued, new requests queue too (slide 39). That's first come, first served, and it keeps big requests from starving.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0016/ABC.java"><code>lessons/code/0016/ABC.java</code></a>. Set the three starting values and add the <code>acquire</code>/<code>release</code> calls in the three loops. Then run:</p>
+<pre class="language-bash">cd lessons/code/0016
+java ABC.java</pre>
+<p>TA prints 2,000 a's, and TB and TC 1,000 each. The checker reads the whole output and names the first rule broken, with its position. Unchanged, the first letter is often a <code>c</code>.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>Follow section 1 exactly. TA: <code>out.append('a'); semA.release();</code>. TB: acquire <code>semC</code>, then <code>semA</code>, append, release <code>semB</code>. TC: acquire <code>semB</code>, then <code>semA</code>, append, release <code>semC</code>. Only one of the three semaphores starts above 0.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Swap the starting values of <code>semB</code> and <code>semC</code>. Which rule does the checker report? (b) Delete both <code>acquire(semA)</code> lines. Which rule breaks now?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>static Semaphore semA = new Semaphore(0);
+static Semaphore semB = new Semaphore(0);
+static Semaphore semC = new Semaphore(1);
+
+// printA loop:  out.append('a'); semA.release();
+// printB loop:  acquire(semC); acquire(semA);
+//               out.append('b'); semB.release();
+// printC loop:  acquire(semB); acquire(semA);
+//               out.append('c'); semC.release();</pre>
+<p>(a) Rule 1: the first non-<code>a</code> is a <code>c</code>. (b) Rule 3. In my runs the very first letter was already a <code>b</code>, before any <code>a</code>.</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Explain how the thread queue (slides 31–35) releases threads in order of arrival. (4 marks)</summary>
+<p>Each thread creates its own semaphore with 0 permits. It adds the semaphore to a shared FIFO queue under a lock, releases the lock, and then calls <code>acquire()</code> on its own semaphore, so it blocks. The controller's <code>next()</code> removes the semaphore at the head of the queue, under the lock, and releases it. That wakes exactly the thread that joined first. Order is guaranteed by the queue, not by the semaphore. The lock is released before blocking so that <code>next()</code> can run.</p></details>
+<details class="recall"><summary>Give the three output rules of the a/b/c problem and say which semaphore enforces each. (6 marks)</summary>
+<p>Rule 1, b before any c: <code>semC</code> starts at 1 and <code>semB</code> at 0, so only TB can print first. Rule 2, b and c alternate: TB waits on <code>semC</code> and releases <code>semB</code>, and TC does the opposite, so the turn passes back and forth. Rule 3, b's + c's ≤ a's: TA releases <code>semA</code> after every <code>a</code>, and TB and TC each acquire <code>semA</code> before printing. Its count can't go below zero, so b's and c's can't overtake the a's.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-sema.pdf">OSTEP ch. 31</a>, section 31.7 ("thread throttling"). About 3 minutes. It's the tunnel from lesson 15 in another setting, and a good check that you can recognise the counting pattern.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>How do you wake threads in arrival order with semaphores?</summary><p>Give each thread its own semaphore starting at 0, keep them in a FIFO queue, and release the head's semaphore.</p></details>
+<details class="recall"><summary>Why must the allocator queue a request that would fit, if others are already waiting?</summary><p>First come, first served: otherwise a large request could be overtaken forever and starve.</p></details>
+<details class="recall"><summary>Write the readers/writers <code>stopRead</code>. (lesson 13)</summary><pre>lock.lock();
+try {
+    readers--;
+    if (readers == 0) wCond.signal();
+} finally { lock.unlock(); }</pre></details>
+
+<div class="next"><a href="0015-semaphores.html">← Lesson 15: semaphores</a><a href="0017-latches-and-barriers.html">Lesson 17: latches and barriers →</a></div>
+
+<footer class="ask">Want the resource allocator as a runnable, self-checking program? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

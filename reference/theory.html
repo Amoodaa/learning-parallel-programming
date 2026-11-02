@@ -11,7 +11,7 @@
 <nav class="crumbs"><a href="course-map.html">Course map</a> · <a href="glossary.html">Glossary</a> · <a href="../lessons/0003-theory-pack.html">Lesson 3</a></nav>
 
 <h1>Theory Sheet</h1>
-<p class="subtitle">The exam theory from all three decks on one page.</p>
+<p class="subtitle">The exam theory from all seven decks on one page.</p>
 
 <h2>Concurrent vs parallel <span class="slides">D1 s8–10</span></h2>
 <div class="table-wrap"><table>
@@ -67,7 +67,25 @@
 <h2>Deadlock in practice <span class="slides">D3 s68–76, 87–91</span></h2>
 <p><strong>Resource ordering</strong> (always lock in one global order) breaks circular wait. <strong><code>tryLock</code></strong> (give up instead of waiting while holding a lock) breaks hold and wait. <strong>Livelock:</strong> threads aren't blocked but keep reacting to each other without progress. <strong>Fair lock:</strong> <code>new ReentrantLock(true)</code> serves the longest-waiting thread first, preventing starvation at a cost in speed.</p>
 
-<p class="slides">Sources: Deck 1 and Deck 3 slides as marked; <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf">OSTEP ch. 26</a>; <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf">OSTEP ch. 32</a>.</p>
+<h2>Condition variables <span class="slides">D4 s2–16</span></h2>
+<p>A <code>Condition</code> belongs to a lock (<code>lock.newCondition()</code>). <code>await()</code> atomically releases the lock and sleeps; when woken it must reacquire the lock before continuing. <code>signal()</code> wakes one waiter, <code>signalAll()</code> all; a signal with nobody waiting is lost. <strong>Always await in a <code>while</code> loop</strong>: another thread may get the lock first and make the condition false again (and spurious wakeups are allowed). <strong>Producer/consumer:</strong> a fixed-size buffer; the producer waits while full, the consumer while empty; two conditions (<code>notFull</code>, <code>notEmpty</code>) on one lock.</p>
+
+<h2>Classic problems <span class="slides">D4 s17–39, s52</span></h2>
+<p><strong>Dining philosophers:</strong> 5 philosophers, 5 chopsticks, each needs both neighbours'. All taking their left at once is a deadlock (all four Coffman conditions). Fixes: allow at most n−1 to try (breaks circular wait); take both at once (breaks hold and wait); take the lower-numbered first (breaks circular wait). <strong>Readers/writers:</strong> one writer at a time, no readers while writing, no writers while reading, many readers together, writers have precedence (a waiting writer blocks new readers, so readers may starve). <strong>Bathroom:</strong> same-gender sharing; a steady stream of one gender can starve the other.</p>
+
+<h2>Stopping a thread <span class="slides">D4 s40–46</span></h2>
+<p><code>t.interrupt()</code>: a running thread only has its interrupted status set and must poll <code>isInterrupted()</code>; a thread blocked in <code>sleep</code>/<code>join</code>/<code>await</code> gets an <code>InterruptedException</code>. Either way the thread stops itself. Suspend/resume: the thread checks a <code>volatile</code> flag at a safe point and awaits a condition until resumed.</p>
+
+<h2>Semaphore <span class="slides">D5 s2–23</span></h2>
+<p>A counter of permits with atomic <code>acquire()</code> (take one, or block while 0) and <code>release()</code> (add one, waking a waiter). Starting value decides the use: <strong>1</strong> = binary semaphore = lock; <strong>0</strong> = signal (TB acquires, TA releases: TA goes first; two of them = rendezvous); <strong>n</strong> = at most n at once (tunnel). Unlike a lock, permits have no owner; any thread may release. A semaphore with n &gt; 1 gives no mutual exclusion, so shared data still needs a lock or atomic. Don't <code>acquire()</code> while holding a lock the releaser needs (s19 deadlock).</p>
+
+<h2>Latch, barrier, blocking queue <span class="slides">D6 s2–32</span></h2>
+<p><strong>CountDownLatch(n):</strong> <code>await()</code> blocks until <code>countDown()</code> has been called n times; one-use. <strong>CyclicBarrier(n):</strong> each of n threads' <code>await()</code> blocks until all n arrive, then all go and it resets; an optional barrier action runs once per trip, before release. <strong>ArrayBlockingQueue:</strong> a ready-made bounded buffer; <code>put</code> blocks while full, <code>take</code> while empty. Stop k consumers with k sentinel values. <strong>Thread pool life cycle</strong> (s33–34): workers repeatedly take a task from the shared queue, run it, and wait for the next; created once and reused, which saves servers creating a thread per request.</p>
+
+<h2>Lock-free <span class="slides">D7 s2–35</span></h2>
+<p><strong>Non-blocking:</strong> failure or suspension of one thread can't cause failure or suspension of another. <strong>Lock-free:</strong> at each step some thread makes progress. Locking is pessimistic (always locks); lock-free is optimistic (update, detect collision, retry). <strong>CAS</strong>(location, expected, new) atomically writes only if the location still holds <code>expected</code>, returning true/false; used in a read–compute–CAS–retry loop. <strong>Pros:</strong> no deadlock, no priority inversion, fast at realistic contention. <strong>Cons:</strong> busy retrying under high contention, CPU cost, hard to write, needs hardware CAS. Atomic classes protect <strong>one variable</strong>, not invariants between several. A spin lock built from <code>AtomicBoolean</code> is still a lock, not non-blocking.</p>
+
+<p class="slides">Sources: Deck 1 and Decks 3–7 slides as marked; <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-intro.pdf">OSTEP ch. 26</a>; <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-bugs.pdf">OSTEP ch. 32</a>.</p>
 </main>
 </body>
 </html>

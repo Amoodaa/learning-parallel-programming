@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interrupts and More Signals</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 14 of 19 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Interrupts and More Signals</h1>
+<p class="subtitle">Stop a thread with <code>interrupt()</code>, pause and resume one with a condition, and solve a problem the slides leave open.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll write the shared-bathroom control from slide 52, which has no solution in the slides. About 25 minutes.</p>
+
+<p>Deck 4 slides 40–56 are a mixed bag. The first two programs control a thread from outside: stopping it (slides 40–42, a better way than lesson 2's flag) and pausing it (slides 43–46). The rest are more problems built from lesson 12's lock-and-condition pattern.</p>
+
+<h2>1 · Stopping a thread with <code>interrupt()</code></h2>
+<p class="slides">Deck 4 · slides 40–42</p>
+
+<p>In lesson 2 you stopped a thread with a <code>volatile boolean</code> flag. That has a weak spot: a thread that is asleep or waiting doesn't look at the flag until it wakes up. Slide 40's <code>main</code> uses the built-in alternative instead, <code>t.interrupt()</code>. What happens depends on what the thread is doing at that moment:</p>
+<ul>
+<li><strong>It's running</strong> (slide 41): nothing happens by itself. Java sets the thread's <em>interrupted status</em>, and the thread has to check it with <code>isInterrupted()</code> and stop on its own.</li>
+<li><strong>It's blocked</strong> in <code>sleep</code>, <code>join</code> or <code>await</code> (slide 42): the call ends early by throwing <code>InterruptedException</code>, and the status is cleared. The thread decides what to do in its <code>catch</code>.</li>
+</ul>
+<pre>// slide 41: a busy thread polls the flag
+while (true) {
+    // do some work
+    if (isInterrupted()) return;
+}
+
+// slide 42: a sleeping thread is woken by an exception
+try { Thread.sleep(100000); }
+catch (InterruptedException e) { b = false; }   // stop</pre>
+<p>Now you know what all those <code>catch (InterruptedException e) {}</code> blocks in the slides are about. An empty catch <strong>ignores</strong> a request to stop. That's harmless in short demo programs, but in slide 42 the catch is the only way the thread ever finishes.</p>
+<span class="sidenote">"If this thread is blocked in an invocation of … <code>join()</code> … <code>sleep(long)</code> … then its interrupt status will be cleared and it will receive an <code>InterruptedException</code>." <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html#interrupt()">Thread.interrupt()</a></span>
+
+<h2>2 · Suspend and resume</h2>
+<p class="slides">Deck 4 · slides 43–46</p>
+
+<p><code>TSuspendResume</code> is a worker that another thread can pause and restart. Between pieces of work, the worker checks a <code>suspended</code> flag, and if it's set, it waits on a <code>resume</code> condition:</p>
+<pre>public void run() {
+    while (go) {
+        // do work
+        lock.lock();
+        try {
+            while (suspended) resume.await();  // + try/catch
+        } finally { lock.unlock(); }
+    }
+}
+public void tSuspend() { suspended = true; }
+public void tResume() {
+    suspended = false;
+    lock.lock();
+    try { resume.signal(); } finally { lock.unlock(); }
+}</pre>
+<p>The thread pauses itself at a <strong>safe point</strong>, between pieces of work and never halfway through one. <code>suspended</code> and <code>go</code> are <code>volatile</code> because they're written outside the lock (lesson 9). <code>tResume</code> takes the lock only because <code>signal()</code> requires it (lesson 12).</p>
+
+<h2>3 · A buffer that holds one value</h2>
+<p class="slides">Deck 4 · slides 47–50</p>
+
+<p>Slide 47 asks for a buffer holding a single <code>int</code>. A reader waits until there's a value, takes it and clears the buffer. A writer waits until the buffer is clear. This is lesson 12's bounded buffer with <code>max = 1</code>, and a <code>boolean item</code> replaces the count:</p>
+<pre>public int read() {                 // slide 49
+    lock.lock();
+    try {
+        while (!item) full.await();     // + try/catch
+        item = false;
+        empty.signal();
+        return x;
+    } finally { lock.unlock(); }
+}
+// write(k): while (item) empty.await();
+//           x = k; item = true; full.signal();</pre>
+<p>Here the slides signal on every read and write, which is correct. Note that <code>return x</code> inside <code>try</code> still runs the <code>finally</code> before the method returns, so the lock is always released.</p>
+
+<h2>4 · The bag of sweets, and a bathroom</h2>
+<p class="slides">Deck 4 · slides 51–56</p>
+
+<p>Slide 51 is just a title ("Pipeline Problem, Thread Topologies?") with nothing on it. Slide 52 sets the exercise below. Slides 53–56 are a bag of sweets: <code>take()</code> waits on <code>notEmpty</code> while <code>bag == 0</code> and then takes one, and a <code>Parent</code> thread keeps calling <code>put()</code>. Two of lesson 12's warnings apply here:</p>
+<ul>
+<li><code>put()</code> signals only <code>if (bag == 1)</code>, the "just stopped being empty" check. With several children waiting, it can leave one asleep while sweets are in the bag. Signal every time.</li>
+<li><code>Parent</code>'s <code>go</code> flag isn't <code>volatile</code>, so setting it from another thread might never stop the loop (lesson 2).</li>
+</ul>
+
+<p><strong>The bathroom</strong> (slide 52). A bathroom is either empty, used by women only, or used by men only. Anyone may enter an empty bathroom. While women are inside, more women may enter but no men, and the other way round. Capacity is unlimited. One way to plan it, the same way as every problem in this deck:</p>
+<ol>
+<li><strong>State:</strong> <code>women</code> and <code>men</code> inside now.</li>
+<li><strong>When must <code>enter(woman)</code> wait?</strong> While someone of the other gender is inside.</li>
+<li><strong>Who changes that, and whom must they wake?</strong> The last person of a gender to leave makes the room empty, and then everyone waiting may be able to enter.</li>
+</ol>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">Main calls <code>t.interrupt()</code> while <code>t</code> is inside <code>Thread.sleep(100000)</code>. What happens?</p>
+<div class="options">
+<button class="opt" data-correct>sleep ends early with an InterruptedException</button>
+<button class="opt">t is killed immediately</button>
+<button class="opt">nothing until the 100 s sleep is over</button>
+<button class="opt">main throws an InterruptedException</button>
+</div>
+<p class="why">A blocked thread is woken by the exception (slide 42), and its <code>catch</code> decides what to do. A running thread just has its interrupted status set and must check it (slide 41).</p>
+</div>
+
+<div class="quiz">
+<p class="q">What's the risk in <code>catch (InterruptedException e) {}</code> inside a loop?</p>
+<div class="options">
+<button class="opt" data-correct>a request to stop is silently ignored</button>
+<button class="opt">the program won't compile</button>
+<button class="opt">the lock is never released</button>
+<button class="opt">the thread is interrupted twice</button>
+</div>
+<p class="why">The exception is how the thread hears "please stop", and catching it also clears the interrupted status. An empty catch just carries on as if nothing had happened.</p>
+</div>
+
+<div class="quiz">
+<p class="q">In suspend/resume, where does the worker actually pause?</p>
+<div class="options">
+<button class="opt" data-correct>at its check between pieces of work</button>
+<button class="opt">wherever it is when tSuspend() is called</button>
+<button class="opt">inside tSuspend()</button>
+<button class="opt">only when it next calls sleep()</button>
+</div>
+<p class="why"><code>tSuspend()</code> only sets a flag. The worker notices it at its own safe point and waits on <code>resume</code>, so it never stops halfway through a piece of work.</p>
+</div>
+
+<div class="quiz">
+<p class="q">In the bathroom, when the last woman leaves, why wake <em>all</em> waiting threads rather than one?</p>
+<div class="options">
+<button class="opt" data-correct>every waiting man may now enter, not just one</button>
+<button class="opt">signal() can only wake women</button>
+<button class="opt">to avoid deadlock between women and men</button>
+<button class="opt">signalAll() releases the lock</button>
+</div>
+<p class="why">Capacity is unlimited, so once the room is empty, every waiting man is allowed in. It's the same reason <code>stopWrite</code> wakes all readers in lesson 13.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0014/Bathroom.java"><code>lessons/code/0014/Bathroom.java</code></a>. One lock, one condition and the two counters are declared. Write <code>enter</code> and <code>leave</code>, then run:</p>
+<pre class="language-bash">cd lessons/code/0014
+java Bathroom.java</pre>
+<p>8 women and 8 men each visit 100 times. <code>PASS</code> needs no mixed visit, at least 2 people of the same gender inside together at some point, and nobody left waiting.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p><code>enter(woman)</code>: inside the usual lock/try/finally, <code>while (woman ? men &gt; 0 : women &gt; 0)</code> await, then increment your own counter. <code>leave(woman)</code>: decrement your counter, and if both counters are now 0, <code>signalAll()</code>.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Replace <code>signalAll()</code> with <code>signal()</code>. Does it still pass? Is it still a good solution? (b) A fairness question for the exam: can a steady stream of women keep a man out forever?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>void enter(boolean woman) {
+    lock.lock();
+    try {
+        while (woman ? men &gt; 0 : women &gt; 0) {
+            try { changed.await(); }
+            catch (InterruptedException e) {}
+        }
+        if (woman) women++; else men++;
+    } finally { lock.unlock(); }
+}
+void leave(boolean woman) {
+    lock.lock();
+    try {
+        if (woman) women--; else men--;
+        if (women == 0 &amp;&amp; men == 0) changed.signalAll();
+    } finally { lock.unlock(); }
+}</pre>
+<p>(a) It still passed on my machine, because it's still safe. But it lets in only one waiting person each time the room empties, even though everyone waiting is allowed in. (b) Yes. As long as at least one woman is inside, more women can enter and the room never empties, so a man can <strong>starve</strong>. Fixing that needs a rule like lesson 13's "a waiting writer blocks new readers".</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Describe two ways of terminating a thread from another thread, and when each one works. (4 marks)</summary>
+<p>(1) A <code>volatile boolean</code> flag that the thread checks in its loop (Deck 1 s72–74). It's simple, but a thread that is sleeping or waiting won't notice the flag until it wakes. (2) <code>t.interrupt()</code> (Deck 4 s40–42). A running thread must poll <code>isInterrupted()</code>, but a thread blocked in <code>sleep</code>, <code>join</code> or <code>await</code> is woken at once with an <code>InterruptedException</code> and can end in its <code>catch</code>. Either way the thread stops itself. Neither forcibly kills it.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> Oracle's <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/interrupt.html">Interrupts</a> page. About 5 minutes. It shows both cases from slides 41 and 42.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>What does <code>interrupt()</code> do to a running thread, and to a sleeping one?</summary><p>Running: sets its interrupted status, which it must check with <code>isInterrupted()</code>. Sleeping, joining or awaiting: the call throws <code>InterruptedException</code> and the status is cleared.</p></details>
+<details class="recall"><summary>Plan any condition-variable problem in three questions.</summary><p>What's the state? When must each method wait? Who changes the state, and whom must they wake (one or all)?</p></details>
+<details class="recall"><summary>Why does a <code>volatile</code> flag work for stopping a thread, but a plain <code>boolean</code> may not? (lesson 2)</summary><p>Without <code>volatile</code> (or a lock), there's no guarantee the running thread ever sees the other thread's write. It may keep using its cached value forever.</p></details>
+
+<div class="next"><a href="0013-philosophers-and-readers.html">← Lesson 13: philosophers and readers</a><a href="0015-semaphores.html">Lesson 15: semaphores →</a></div>
+
+<footer class="ask">Want the pipeline from slide 51 turned into an exercise, or a starvation-free bathroom? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

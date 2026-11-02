@@ -11,7 +11,7 @@
 <nav class="crumbs" aria-label="Site navigation"><a href="../index.html">Home</a> · <a href="glossary.html">Glossary</a> · <a href="thread-basics.html">Thread basics</a> · <a href="theory.html">Theory sheet</a></nav>
 
 <h1>Course map</h1>
-<p class="subtitle">Eleven short lessons. Follow them in order.</p>
+<p class="subtitle">Nineteen short lessons. Follow them in order.</p>
 
 <ol class="course-route">
 <li><a href="../lessons/0001-start-and-join.html">Start and join</a><span>Make a thread, wait for it, read its result.</span></li>
@@ -25,8 +25,16 @@
 <li><a href="../lessons/0009-visibility-and-locks.html">Visibility and locks</a><span>volatile vs locks, static locks, reentrancy, monitors.</span></li>
 <li><a href="../lessons/0010-thread-safe-classes.html">Thread-safe classes</a><span>No leaked references, immutability, coarse vs fine locks.</span></li>
 <li><a href="../lessons/0011-deadlock-and-lock.html">Deadlock and Lock</a><span>Lock ordering, ReentrantLock, tryLock.</span></li>
+<li><a href="../lessons/0012-condition-variables.html">Condition variables</a><span>await and signal; the bounded buffer.</span></li>
+<li><a href="../lessons/0013-philosophers-and-readers.html">Philosophers and readers/writers</a><span>Two classic problems: deadlock fixed, readers share.</span></li>
+<li><a href="../lessons/0014-interrupts-and-signals.html">Interrupts and more signals</a><span>interrupt(), suspend/resume, one-slot buffer, bathroom.</span></li>
+<li><a href="../lessons/0015-semaphores.html">Semaphores</a><span>Permits as a lock, a signal, or a limit.</span></li>
+<li><a href="../lessons/0016-semaphore-puzzles.html">Semaphore puzzles</a><span>The a/b/c puzzle, a thread queue, a resource allocator.</span></li>
+<li><a href="../lessons/0017-latches-and-barriers.html">Latches and barriers</a><span>CountDownLatch and CyclicBarrier.</span></li>
+<li><a href="../lessons/0018-queues-and-pools.html">Blocking queues and pools</a><span>ArrayBlockingQueue with sentinels; pools revisited.</span></li>
+<li><a href="../lessons/0019-lock-free.html">Lock-free</a><span>Compare-and-swap, atomic classes, a lock-free stack.</span></li>
 </ol>
-<p class="slides">Lessons 1–3 cover Deck 1, lessons 4–7 Deck 2, and lessons 8–11 Deck 3. Only the three decks below are in scope.</p>
+<p class="slides">Lessons 1–3 cover Deck 1, 4–7 Deck 2, 8–11 Deck 3, 12–14 Deck 4, 15–16 Deck 5, 17–18 Deck 6, and 19 Deck 7. Only the seven decks below are in scope.</p>
 
 <details class="recall">
 <summary>Deck 1 · slide guide</summary>
@@ -98,7 +106,76 @@
 </details>
 
 <details class="recall">
-<summary>Slide errata · 14 corrections</summary>
+<summary>Deck 4 · slide guide</summary>
+<p><a href="../source-materials/ConditionVariablesLecture.ppt">Download Condition variables slides</a>. Waiting inside a lock until a condition holds. Decks 4–7 are by Tony Mullins.</p>
+<p class="slides">Lesson 12: slides 2–16 · Lesson 13: 17–39 · Lesson 14: 40–56. Slide 1 is the title.</p>
+<ul>
+<li>2–4: sharing a limited resource; the problems ahead. <a href="../lessons/0012-condition-variables.html">Lesson 12</a>.</li>
+<li>5–6: <code>newCondition</code>, <code>await</code>, <code>signal</code>/<code>signalAll</code>; await in a <code>while</code>. <a href="../lessons/0012-condition-variables.html">Lesson 12</a>.</li>
+<li>7–12: garden with a limit; port allocator. <a href="../lessons/0012-condition-variables.html">Lesson 12</a>. See errata.</li>
+<li>13–16: producer/consumer bounded buffer. <a href="../lessons/0012-condition-variables.html">Lesson 12</a>. See errata.</li>
+<li>17–31: dining philosophers: chopsticks, deadlock, the n−1 fix. <a href="../lessons/0013-philosophers-and-readers.html">Lesson 13</a>. See errata.</li>
+<li>32–39: readers/writers with writer precedence. <a href="../lessons/0013-philosophers-and-readers.html">Lesson 13</a>. See errata.</li>
+<li>40–42: stopping a thread with <code>interrupt()</code>. <a href="../lessons/0014-interrupts-and-signals.html">Lesson 14</a>.</li>
+<li>43–46: suspend and resume. <a href="../lessons/0014-interrupts-and-signals.html">Lesson 14</a>.</li>
+<li>47–50: single-value buffer. <a href="../lessons/0014-interrupts-and-signals.html">Lesson 14</a>.</li>
+<li>51: title only ("Pipeline problem"). Skip.</li>
+<li>52: the shared bathroom (no solution given). Exercise in <a href="../lessons/0014-interrupts-and-signals.html">lesson 14</a>.</li>
+<li>53–56: bag of sweets. <a href="../lessons/0014-interrupts-and-signals.html">Lesson 14</a>. See errata.</li>
+</ul>
+<p>Read top to bottom: <strong>hold the lock, wait in a <code>while</code> loop until you can go, change the state, then signal whoever waits on the other side.</strong></p>
+</details>
+
+<details class="recall">
+<summary>Deck 5 · slide guide</summary>
+<p><a href="../source-materials/Semaphores.ppt">Download Semaphores slides</a>. A counter of permits used as a lock, a signal or a limit.</p>
+<p class="slides">Lesson 15: slides 2–23 · Lesson 16: 24–45. Slide 1 is the title.</p>
+<ul>
+<li>2–5: acquire/release; binary semaphore as a lock. <a href="../lessons/0015-semaphores.html">Lesson 15</a>.</li>
+<li>6–9: make TA go before TB. <a href="../lessons/0015-semaphores.html">Lesson 15</a>.</li>
+<li>10–13: rendezvous. <a href="../lessons/0015-semaphores.html">Lesson 15</a>. See errata.</li>
+<li>14–18: the tunnel: at most n inside. <a href="../lessons/0015-semaphores.html">Lesson 15</a>.</li>
+<li>19: <code>acquire()</code> inside <code>synchronized</code> deadlocks. <a href="../lessons/0015-semaphores.html">Lesson 15</a>.</li>
+<li>20–23: producer/consumer with two semaphores and a lock. <a href="../lessons/0015-semaphores.html">Lesson 15</a>.</li>
+<li>24–30: the a/b/c output puzzle. <a href="../lessons/0016-semaphore-puzzles.html">Lesson 16</a>. See errata.</li>
+<li>31–35: a FIFO queue of waiting threads. <a href="../lessons/0016-semaphore-puzzles.html">Lesson 16</a>.</li>
+<li>36–45: first-come-first-served resource allocator. <a href="../lessons/0016-semaphore-puzzles.html">Lesson 16</a>. See errata.</li>
+</ul>
+<p>Read top to bottom: <strong>the starting value decides the job: 1 is a lock, 0 is "wait for my signal", n is "at most n at once". A semaphore per thread lets you wake one particular thread.</strong></p>
+</details>
+
+<details class="recall">
+<summary>Deck 6 · slide guide</summary>
+<p><a href="../source-materials/LatchesBarriers.ppt">Download Latches and barriers slides</a>. Ready-made synchronizers from <code>java.util.concurrent</code>, then pools again.</p>
+<p class="slides">Lesson 17: slides 2–22 · Lesson 18: 23–53. Slide 1 is the title.</p>
+<ul>
+<li>2–8: <code>CountDownLatch</code>: start gate and finish line. <a href="../lessons/0017-latches-and-barriers.html">Lesson 17</a>.</li>
+<li>9–14: <code>CyclicBarrier</code>: three threads initialise, meet, then compute. <a href="../lessons/0017-latches-and-barriers.html">Lesson 17</a>.</li>
+<li>15–17: barrier action (slide 17 is blank). <a href="../lessons/0017-latches-and-barriers.html">Lesson 17</a>.</li>
+<li>18–22: array smoother, one thread per element. <a href="../lessons/0017-latches-and-barriers.html">Lesson 17</a>. See errata.</li>
+<li>23–32: <code>ArrayBlockingQueue</code>; producer, two consumers, sentinels. <a href="../lessons/0018-queues-and-pools.html">Lesson 18</a>.</li>
+<li>33–47: thread pools again; a semaphore as the screen lock. Mostly <a href="../lessons/0005-thread-pools.html">lesson 5</a>; what's new is in <a href="../lessons/0018-queues-and-pools.html">lesson 18</a>. See errata.</li>
+<li>48–53: <code>Callable</code> and <code>Future</code> again. <a href="../lessons/0005-thread-pools.html">Lesson 5</a>; summary in <a href="../lessons/0018-queues-and-pools.html">lesson 18</a>.</li>
+</ul>
+<p>Read top to bottom: <strong>a latch waits for events and opens once; a barrier waits for threads and resets; a blocking queue is the bounded buffer, ready-made.</strong></p>
+</details>
+
+<details class="recall">
+<summary>Deck 7 · slide guide</summary>
+<p><a href="../source-materials/LockFreeDataStructures.ppt">Download Lock-free data structures slides</a>. Thread safety by retrying instead of waiting.</p>
+<p class="slides">Lesson 19: slides 2–35. Slide 1 is the title.</p>
+<ul>
+<li>2–8: non-blocking and lock-free; pessimistic vs optimistic; pros and cons. <a href="../lessons/0019-lock-free.html">Lesson 19</a>.</li>
+<li>9–13: compare-and-swap and the retry loop. <a href="../lessons/0019-lock-free.html">Lesson 19</a>. See errata.</li>
+<li>14–24: atomic classes; counters with and without CAS; their limits. <a href="../lessons/0019-lock-free.html">Lesson 19</a>. See errata.</li>
+<li>25–29: array stack guarded by an <code>AtomicBoolean</code> spin lock. <a href="../lessons/0019-lock-free.html">Lesson 19</a>.</li>
+<li>30–35: lock-free linked stack. <a href="../lessons/0019-lock-free.html">Lesson 19</a>. See errata.</li>
+</ul>
+<p>Read top to bottom: <strong>read, compute, compare-and-set, retry on failure. It works when the whole state is one variable.</strong></p>
+</details>
+
+<details class="recall">
+<summary>Slide errata · 28 corrections</summary>
 <h2 id="errata">Slide errata</h2>
 <p>Known mistakes in the slides and what to use instead.</p>
 <div class="table-wrap"><table class="errata">
@@ -118,6 +195,20 @@
 <tr><td>D3 s13</td><td>Says <code>long</code> and <code>double</code> need two reads and two writes.</td><td>Only when not <code>volatile</code>; <code>volatile long</code>/<code>double</code> reads and writes are atomic (<a href="https://docs.oracle.com/javase/specs/jls/se21/html/jls-17.html#jls-17.7">JLS §17.7</a>).</td></tr>
 <tr><td>D3 s35</td><td>Offers <code>synchronized void terminate()</code> as a solution on its own.</td><td>The loop reading <code>go</code> must take the same lock, or <code>go</code> must be <code>volatile</code>. Writer-only locking never stopped the thread when tested on Java 26 (<a href="../lessons/0009-visibility-and-locks.html">lesson 9</a>).</td></tr>
 <tr><td>D3 s55</td><td><code>if(!(p instanceof Book) return false;</code> is missing a <code>)</code>.</td><td><code>if (!(p instanceof Book)) return false;</code></td></tr>
+<tr><td>D4 s8, s15–16, s55</td><td>Signals only on the "just stopped being full/empty" step (<code>if(size - 1 == 0) notEmpty.signal();</code>, <code>if(bag==1)</code>). With several waiting threads, two quick puts send one signal, and a second waiter sleeps while an item is available. The slides' buffer with 4 producers and 4 consumers hung in 20 runs out of 20.</td><td>Signal on every put and get (<a href="../lessons/0012-condition-variables.html">lesson 12</a>). The <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/locks/Condition.html">Condition Javadoc</a>'s buffer does this.</td></tr>
+<tr><td>D4 s9</td><td><code>garden.T1</code> is missing <code>()</code>; <code>T2</code> is never shown.</td><td><code>garden.T1();</code>. <code>T2</code> is the same as <code>T1</code>.</td></tr>
+<tr><td>D4 s27</td><td>Says limiting to n−1 philosophers also stops one "eating forever".</td><td>The limit prevents deadlock only. Eating ends because <code>eat()</code> sleeps a fixed time.</td></tr>
+<tr><td>D4 s33</td><td><code>private lock = new ReentrantLock();</code> has no type.</td><td><code>private Lock lock = new ReentrantLock();</code></td></tr>
+<tr><td>D4 s56</td><td><code>Parent</code>'s <code>go</code> flag isn't <code>volatile</code>.</td><td><code>volatile boolean go</code> (same as the D2 s7 row).</td></tr>
+<tr><td>D5 s11</td><td>Comment says "ensure that TA executes before TB" (copied from s7).</td><td>It's a rendezvous: neither goes first.</td></tr>
+<tr><td>D5 s26–30</td><td>Starting values of <code>semA</code>, <code>semB</code>, <code>semC</code> never shown; TC's final version isn't shown.</td><td><code>semA = 0</code>, <code>semB = 0</code>, <code>semC = 1</code> (so b goes first). TC mirrors TB (<a href="../lessons/0016-semaphore-puzzles.html">lesson 16</a>).</td></tr>
+<tr><td>D5 s39, s44</td><td><code>getResources</code> <code>throws Exception</code> but s44 calls it with no <code>try</code>; <code>getMax()</code> is never defined.</td><td>Wrap the call in <code>try</code>/<code>catch</code>; add <code>int getMax() { return maxResources; }</code>.</td></tr>
+<tr><td>D6 s22</td><td>End elements have one neighbour but are still divided by 3.</td><td>Divide by the number of values summed (2 at the ends).</td></tr>
+<tr><td>D6 s36</td><td>Says <code>shutdown()</code> shuts the pool down "when all submitted tasks complete", as if it waits.</td><td>It returns at once; queued tasks still run. Wait with <code>awaitTermination</code> (s37, s46) or <code>Future.get()</code>.</td></tr>
+<tr><td>D6 s49</td><td><code>E call()</code></td><td><code>V call()</code>, matching <code>Callable&lt;V&gt;</code> on s48.</td></tr>
+<tr><td>D7 s12</td><td><code>while (!cas(x,x0,x1) {</code> is missing a <code>)</code>.</td><td><code>while (!cas(x, x0, x1)) {</code></td></tr>
+<tr><td>D7 s20</td><td><code>private AtomicInteger value;</code> is never created, so <code>inc()</code> throws <code>NullPointerException</code>.</td><td><code>private final AtomicInteger value = new AtomicInteger(0);</code></td></tr>
+<tr><td>D7 s34</td><td><code>head()</code> returns <code>head.get().item</code>: <code>NullPointerException</code> on an empty stack.</td><td>Check <code>head.get() == null</code> first and return <code>null</code>.</td></tr>
 </table></div>
 </details>
 

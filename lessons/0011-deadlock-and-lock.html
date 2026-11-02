@@ -10,7 +10,7 @@
 </head>
 <body>
 <main>
-<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 11 of 11 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 11 of 19 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
 
 <h1>Deadlock and Lock</h1>
 <p class="subtitle">When an action needs two locks, take them in a fixed order. Then meet <code>ReentrantLock</code>, the explicit version of <code>synchronized</code>.</p>
@@ -157,7 +157,7 @@ Lock second = locks[Math.max(g, h)];</pre>
 <p>Marks are my estimate, not taken from your exam.</p>
 
 <h2>Read next</h2>
-<p><strong>Primary source:</strong> Oracle's <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Deadlock</a>, <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/starvelive.html">Starvation and Livelock</a> and <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/newlocks.html">Lock Objects</a> (which solves its deadlock with <code>tryLock</code>, like slide 91). About 10 minutes. That completes the three decks.</p>
+<p><strong>Primary source:</strong> Oracle's <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/deadlock.html">Deadlock</a>, <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/starvelive.html">Starvation and Livelock</a> and <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/newlocks.html">Lock Objects</a> (which solves its deadlock with <code>tryLock</code>, like slide 91). About 10 minutes. That completes Deck 3. Lesson 12 starts Deck 4: what to do when a thread holds the lock but has to wait for something.</p>
 
 <h2>Next time, from memory</h2>
 <details class="recall"><summary>Write slide 80's lock pattern.</summary><pre>lock.lock();
@@ -166,9 +166,9 @@ finally { lock.unlock(); }</pre></details>
 <details class="recall"><summary>Two ways the slides prevent deadlock in the shuffle, and which condition each breaks.</summary><p>Lock in a fixed order (circular wait); <code>tryLock</code> the second lock and give up if it's taken (hold and wait).</p></details>
 <details class="recall"><summary>Coarse vs fine-grained locking in one line each. (lesson 10)</summary><p>Coarse: one lock for everything; simple, less concurrency. Fine: a lock per part; more concurrency, more complexity and deadlock risk.</p></details>
 
-<div class="next"><a href="0010-thread-safe-classes.html">← Lesson 10: thread-safe classes</a><a href="../reference/course-map.html">Course map →</a></div>
+<div class="next"><a href="0010-thread-safe-classes.html">← Lesson 10: thread-safe classes</a><a href="0012-condition-variables.html">Lesson 12: condition variables →</a></div>
 
-<footer class="ask">Want a runnable version of the theatre or garden, or a mixed revision quiz across all eleven lessons? Ask your teacher (the agent) in the terminal.</footer>
+<footer class="ask">Want a runnable version of the theatre or garden, or a mixed revision quiz across lessons 8–11? Ask your teacher (the agent) in the terminal.</footer>
 </main>
 </body>
 </html>

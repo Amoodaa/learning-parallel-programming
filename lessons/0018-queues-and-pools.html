@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blocking Queues and Pools Revisited</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 18 of 19 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Blocking Queues and Pools Revisited</h1>
+<p class="subtitle">Lesson 12's bounded buffer, ready-made as <code>ArrayBlockingQueue</code>. Then Deck 6 goes back over thread pools, with two new details.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll make two consumer threads stop cleanly when a producer runs out of work, using "sentinel" values. About 20 minutes.</p>
+
+<p>Deck 6 slides 23–53 have two parts. Slides 23–32 replace the producer/consumer buffer you wrote by hand in lesson 12 with a library class. Slides 33–53 repeat Deck 2's thread pools (lesson 5) almost slide for slide. This lesson spends its time on the queue and only points out what's new in the pool slides.</p>
+
+<h2>1 · <code>ArrayBlockingQueue</code></h2>
+<p class="slides">Deck 6 · slides 23–24</p>
+
+<p>A first-in-first-out queue with a <strong>fixed capacity</strong>, held in an array (slide 23): exactly lesson 12's bounded buffer. Its two blocking methods (slide 24):</p>
+<pre>ArrayBlockingQueue&lt;Job&gt; q = new ArrayBlockingQueue&lt;&gt;(8);
+q.put(job);        // waits while full
+Job j = q.take();  // waits while empty; removes the head
+// both may throw InterruptedException</pre>
+<p>Inside, it's the same lock and two conditions you wrote yourself, so you don't need to write them again. You can't change the capacity after creating it.</p>
+
+<h2>2 · Filling a matrix: one producer, two consumers</h2>
+<p class="slides">Deck 6 · slides 25–32</p>
+
+<p>The job is to fill a 100×10 matrix one column at a time, with two consumers working in parallel on a dual-core machine (slide 26). Slide 25 says it's another version of a Deck 2 program.</p>
+<ul>
+<li><code>BufferData</code> (slide 27) is a job: a reference to the matrix plus a column number. The queue holds jobs, not numbers.</li>
+<li>The <strong>producer</strong> (slide 30) puts one job per column, then two <strong>sentinels</strong>: jobs with <code>null</code> data and column −1.</li>
+<li>Each <strong>consumer</strong> (slides 31–32) takes a job, fills its column, and repeats until it takes a sentinel. Then it stops.</li>
+<li><code>main</code> (slides 28–29) joins both consumers and prints the matrix.</li>
+</ul>
+<p>Why sentinels? A consumer blocked in <code>take()</code> on an empty queue can't tell "no job <em>yet</em>" from "no job <em>ever</em>". A sentinel is a message in the queue itself that says "stop". It has to be <strong>one per consumer</strong>, because each consumer that takes one stops and doesn't pass it on. With only one sentinel, the other consumer waits in <code>take()</code> forever, and <code>main</code>'s <code>join()</code> waits for it forever too.</p>
+<p>The queue holds only 8 jobs, so the producer blocks in <code>put()</code> when it gets ahead. That's the point of a <em>bounded</em> buffer: the producer can't run away from slow consumers (lesson 12's slide 13).</p>
+
+<h2>3 · Thread pools, again</h2>
+<p class="slides">Deck 6 · slides 33–53</p>
+
+<p>Most of this is lesson 5. <code>Executors.newFixedThreadPool(k)</code>, <code>submit</code>, <code>Future.get()</code>, <code>shutdown()</code> and <code>awaitTermination</code> work as they did there. Slides 33–34 describe the pool's insides in words, and with this deck you can now read it as "<strong>worker threads consuming tasks from a blocking queue</strong>": each worker repeatedly takes the next task, runs it, and goes back to waiting. That reuse is why servers use pools: they avoid creating a thread per client request.</p>
+
+<p>What's new compared with lesson 5:</p>
+<ul>
+<li><strong>A semaphore as the screen lock</strong> (slides 43–47). Four tasks each print a line of numbers, and the lines get mixed up. Each task now does <code>screen.acquire()</code>, prints its line, then <code>screen.release()</code>, with <code>new Semaphore(1)</code> shared between them. That's lesson 15's binary semaphore used as a lock (compare Deck 3's <code>synchronized</code> screen in lesson 8).</li>
+<li><strong>Reusing the pool</strong> (slide 45): after waiting for the first four tasks, <code>main</code> submits four more to the same pool. Creating a pool once and reusing it is the whole point.</li>
+<li><strong>Waiting two ways</strong>: slide 41 calls <code>get()</code> on every <code>Future</code>, and slide 46 calls <code>shutdown()</code> and then <code>awaitTermination(1000, MILLISECONDS)</code>. That second call gives up after 1 s, and its <code>boolean</code> result (did everything finish?) is ignored.</li>
+</ul>
+<span class="sidenote">Slide 36 says <code>shutdown()</code> will "shutdown pool when all submitted tasks complete". It doesn't wait: it stops new tasks being accepted and returns at once, while queued tasks keep running. Waiting is <code>awaitTermination</code>'s job, which is why slide 46 calls both (lesson 5 has the Javadoc quote).</span>
+<p>Slides 48–53 redo <code>Callable</code>: a <code>Square</code> task returns <code>n*n</code>, and <code>main</code> collects the <code>Future&lt;Integer&gt;</code>s in a list and calls <code>get()</code> on each. That's lesson 5's section 3. (Slide 49 writes <code>E call()</code>, but the interface's type parameter is <code>V</code>, as on slide 48.)</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">A producer calls <code>put()</code> on a full <code>ArrayBlockingQueue</code>. What happens?</p>
+<div class="options">
+<button class="opt" data-correct>it waits until a consumer takes something</button>
+<button class="opt">it throws an exception</button>
+<button class="opt">the queue grows</button>
+<button class="opt">the oldest item is dropped</button>
+</div>
+<p class="why"><code>put</code> blocks while the queue is full and <code>take</code> blocks while it's empty (slide 24). It's lesson 12's <code>notFull</code>/<code>notEmpty</code>, built in.</p>
+</div>
+
+<div class="quiz">
+<p class="q">There are two consumers. Why does the producer put <strong>two</strong> sentinels?</p>
+<div class="options">
+<button class="opt" data-correct>each consumer stops after taking one, so each needs its own</button>
+<button class="opt">one marks the end of the rows, one the columns</button>
+<button class="opt">in case one is lost</button>
+<button class="opt">the queue needs an even number of items</button>
+</div>
+<p class="why">A consumer that takes the only sentinel stops. The other then blocks in <code>take()</code> forever, and <code>main</code>'s <code>join()</code> hangs with it.</p>
+</div>
+
+<div class="quiz">
+<p class="q">What does <code>pool.shutdown()</code> do?</p>
+<div class="options">
+<button class="opt" data-correct>rejects new tasks; queued ones still run; returns at once</button>
+<button class="opt">waits for all tasks to complete</button>
+<button class="opt">cancels all running tasks</button>
+<button class="opt">pauses the pool until resumed</button>
+</div>
+<p class="why">Slide 36 implies it waits, but it doesn't. Follow it with <code>awaitTermination</code> (slide 46) or <code>get()</code> on every <code>Future</code> (slide 41) to wait.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Which one returns a value to the code that submitted it? (lesson 5)</p>
+<div class="options">
+<button class="opt" data-correct>a Callable, through a Future</button>
+<button class="opt">a Runnable, through a Future</button>
+<button class="opt">a Runnable, through its run() method</button>
+<button class="opt">neither; use a shared variable</button>
+</div>
+<p class="why"><code>call()</code> returns a value and may throw a checked exception. <code>run()</code> is <code>void</code>. <code>submit</code> returns a <code>Future</code> either way, but a Runnable's future only tells you when it's done.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0018/Columns.java"><code>lessons/code/0018/Columns.java</code></a>. The producer puts one job per column of a 200×500 matrix, and two consumers fill the columns. Unchanged, the consumers never stop. Fix the two <code>TODO</code>s, then run:</p>
+<pre class="language-bash">cd lessons/code/0018
+java Columns.java</pre>
+<p><code>PASS</code> means every column was filled exactly once, the queue ended empty, and all three threads finished. A Java <code>record</code> such as <code>record Job(int col) {}</code> is a short way to write slide 27's class: <code>job.col()</code> reads the field.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>Producer: after the loop, put <code>new Job(-1)</code> once per consumer (<code>CONSUMERS</code>). Consumer: take a job before the loop, then <code>while (job.col() != -1) { fill(job.col()); job = queue.take(); }</code>. That's slide 32's loop.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Put only one sentinel. What does the checker report? (b) Without changing the producer, how could a consumer that takes the sentinel make sure the other consumer stops too?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>static void producer() throws InterruptedException {
+    for (int c = 0; c &lt; COLS; c++) queue.put(new Job(c));
+    for (int i = 0; i &lt; CONSUMERS; i++)
+        queue.put(new Job(-1));
+}
+
+static void consumer() throws InterruptedException {
+    Job job = queue.take();
+    while (job.col() != -1) {
+        fill(job.col());
+        job = queue.take();
+    }
+}</pre>
+<p>(a) "still running after 5 s: a consumer is blocked in take()". (b) Put the sentinel back before stopping: <code>queue.put(job);</code> after the loop. Then the next consumer finds it too, and one sentinel is enough for any number of consumers. (This checker will still say FAIL, because it expects an empty queue and one sentinel is left at the end. The columns are all filled correctly.)</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Describe the life cycle of a worker thread in a thread pool, and why pools are used in servers. (4 marks)</summary>
+<p>A pool has a fixed number of worker threads and a shared queue of tasks (Runnables or Callables). Each worker repeatedly takes the next task from the queue, waiting if it's empty, runs it to completion, and goes back for another (slides 33–34). The threads are created once and reused. Servers use pools because creating a new thread for every client request is expensive, and an unbounded number of threads would overload the machine. A pool caps the number of threads and avoids the creation cost.</p></details>
+<details class="recall"><summary>How do the consumers in slides 30–32 know when to stop, and why is a special value needed? (3 marks)</summary>
+<p>After the real jobs, the producer puts one sentinel job per consumer (null data, column −1). A consumer loops on <code>take()</code> until it receives a sentinel, then exits. A special value is needed because <code>take()</code> on an empty queue just blocks: an empty queue can't tell a consumer that no more work is coming.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> the class description at the top of the <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html"><code>BlockingQueue</code> Javadoc</a>. About 5 minutes. Its usage example is a producer/consumer like slides 30–32. Skip the table of other methods: the slides use only <code>put</code> and <code>take</code>.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>How many sentinels for k consumers, and why?</summary><p>k. Each consumer stops at the first sentinel it takes and doesn't pass it on. (Or use one sentinel that each consumer puts back before stopping.)</p></details>
+<details class="recall"><summary>What does <code>shutdown()</code> not do, and what does?</summary><p>It doesn't wait. <code>awaitTermination(timeout, unit)</code> waits, and so does calling <code>get()</code> on every <code>Future</code>.</p></details>
+<details class="recall"><summary>Latch or barrier: <code>main</code> waits for 3 workers to finish. (lesson 17)</summary><p>A <code>CountDownLatch(3)</code>: each worker calls <code>countDown()</code> and <code>main</code> calls <code>await()</code>.</p></details>
+
+<div class="next"><a href="0017-latches-and-barriers.html">← Lesson 17: latches and barriers</a><a href="0019-lock-free.html">Lesson 19: lock-free →</a></div>
+
+<footer class="ask">Want a pool-based version of the column filler, to compare with the queue? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

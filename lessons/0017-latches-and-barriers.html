@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Latches and Barriers</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 17 of 19 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Latches and Barriers</h1>
+<p class="subtitle">Two ready-made ways to make a group of threads wait. A latch waits for events to happen; a barrier waits for threads to arrive.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll fix a one-thread-per-element array smoother that gives wrong answers in 100 trials out of 100. About 20 minutes.</p>
+
+<p>Deck 6 (Latches and Barriers) moves from building tools yourself to using the ones in <code>java.util.concurrent</code>. You could build both of today's tools from lesson 12's conditions. Here they come ready-made. Slides 2–22 cover <code>CountDownLatch</code> and <code>CyclicBarrier</code>, and lesson 18 covers the rest of the deck.</p>
+
+<h2>1 · <code>CountDownLatch</code>: a gate</h2>
+<p class="slides">Deck 6 · slides 2–8</p>
+
+<p>A latch is a <strong>gate</strong> (slide 2). It starts with a count of events. <code>countDown()</code> records one event, and <code>await()</code> blocks until the count reaches 0. Then the gate opens for good, and every waiting thread, and any thread that awaits later, passes straight through.</p>
+<pre>import java.util.concurrent.*;
+
+CountDownLatch start = new CountDownLatch(1);
+start.await();       // block until count is 0 (+ try)
+start.countDown();   // count - 1; never blocks</pre>
+<p>The slides use it two ways:</p>
+<ul>
+<li><strong>Starting gun</strong> (slides 3–5): a latch of <strong>1</strong>. Ten threads call <code>start.await()</code>, and <code>main</code> calls <code>start.countDown()</code> once to release them all together.</li>
+<li><strong>Finish line</strong> (slides 6–8): a second latch of <strong>10</strong>. Each thread calls <code>end.countDown()</code> when it's done, and <code>main</code> calls <code>end.await()</code>. That's lesson 1's <code>join()</code> loop in one call, and it works even when you don't have the <code>Thread</code> objects.</li>
+</ul>
+<p>A latch can't be reset. Once it's open, it stays open.</p>
+
+<h2>2 · <code>CyclicBarrier</code>: a meeting point</h2>
+<p class="slides">Deck 6 · slides 9–14</p>
+
+<p>A barrier is lesson 15's <strong>rendezvous for a whole group</strong> (slide 9). You create it for <code>n</code> parties, and each thread that calls <code>await()</code> blocks until all <code>n</code> have called it. Then all are released together, and the barrier resets itself, ready for the next meeting. That's why it's called <em>cyclic</em>.</p>
+<pre>CyclicBarrier barrier = new CyclicBarrier(3);
+try { barrier.await(); }                  // wait for all 3
+catch (InterruptedException e) {}
+catch (BrokenBarrierException e) {}       // someone gave up</pre>
+<p><code>BrokenBarrierException</code> is thrown if another party is interrupted or times out while waiting. The barrier is then "broken", so the remaining threads don't wait forever.</p>
+
+<p>Slides 10–14 use both tools. Three threads share one array. Each first fills <strong>its own third</strong> with random numbers (using lesson 4's <code>j*N/k</code> split), then calculates something over the <strong>whole</strong> array: the sum of the odd numbers, the sum of the even numbers, or how many odd numbers there are. No thread may start calculating until all three thirds are filled, so each calls <code>barrier.await()</code> between the two phases. <code>main</code> waits for all three with a latch of 3.</p>
+
+<div class="table-wrap"><table>
+<tr><th></th><th>CountDownLatch</th><th>CyclicBarrier</th></tr>
+<tr><td>Waits for</td><td>a number of <strong>events</strong> (<code>countDown</code> calls)</td><td>a number of <strong>threads</strong> to arrive</td></tr>
+<tr><td>Who waits</td><td>any threads, often not the ones counting down</td><td>the arriving threads themselves</td></tr>
+<tr><td>Reuse</td><td>one use only</td><td>resets after each meeting</td></tr>
+<tr><td>Slides' use</td><td>"go" signal; main waits for the end</td><td>"everyone finished phase 1"</td></tr>
+</table></div>
+
+<h2>3 · The barrier action</h2>
+<p class="slides">Deck 6 · slides 15–17</p>
+
+<p><code>new CyclicBarrier(n, action)</code> takes a <code>Runnable</code> that runs <strong>once</strong> each time the barrier trips. It runs after the last thread arrives and before any is released (slide 15), so it's the place to check or update shared state between phases. Slide 16 describes an example: 5 threads fill their own segments, and the barrier action checks the whole array before they continue. Slide 17, which would have shown the code, is blank.</p>
+
+<h2>4 · The array smoother</h2>
+<p class="slides">Deck 6 · slides 18–22</p>
+
+<p>Replace each element with the average of itself and its neighbours (slide 18), using one thread per element. Each thread must read the <strong>old</strong> values of its neighbours, but the neighbours are writing new values into the same array. The fix is a barrier between reading and writing:</p>
+<pre>double sum = data[k];                      // read phase
+if (k &gt; 0) sum += data[k - 1];
+if (k &lt; data.length - 1) sum += data[k + 1];
+barrier.await();                           // all have read
+data[k] = sum / 3.0;                       // write phase
+latch.countDown();                         // tell main</pre>
+<p>Without the barrier, thread 5 might read <code>data[4]</code> after thread 4 has overwritten it. That's a race (lesson 3), and the result depends on timing.</p>
+<span class="sidenote">Two notes on slides 18–22. The end elements have only one neighbour, but slide 22 still divides by 3, so <code>data[0]</code> becomes (2 values)/3. Divide by the number of values actually added. Also, one thread per element is fine for 10 elements, but Deck 2 slides 15–21 (lesson 4) showed it's slower than no threads at all for 100,000.</span>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">Ten threads must all start at the same moment when <code>main</code> says go. What do you use?</p>
+<div class="options">
+<button class="opt" data-correct>a CountDownLatch(1): threads await, main counts down once</button>
+<button class="opt">a CountDownLatch(10): main awaits</button>
+<button class="opt">a CyclicBarrier(10) that main awaits</button>
+<button class="opt">a Semaphore(10)</button>
+</div>
+<p class="why">One event ("go") is enough, and many threads wait for it. A latch of 10 that <code>main</code> awaits is the other pattern: waiting for all threads to <em>finish</em>.</p>
+</div>
+
+<div class="quiz">
+<p class="q">What's the main difference between a latch and a barrier?</p>
+<div class="options">
+<button class="opt" data-correct>a barrier waits for threads to arrive and can be reused</button>
+<button class="opt">a latch can be reused; a barrier can't</button>
+<button class="opt">a latch only works with two threads</button>
+<button class="opt">a barrier never blocks</button>
+</div>
+<p class="why">A latch counts events and opens for good. A barrier makes its own parties wait for each other, then resets for the next round (slide 9).</p>
+</div>
+
+<div class="quiz">
+<p class="q">In the smoother, what goes wrong without the barrier?</p>
+<div class="options">
+<button class="opt" data-correct>a thread may read a neighbour's new value instead of the old one</button>
+<button class="opt">two threads write the same element</button>
+<button class="opt">main prints before threads start</button>
+<button class="opt">it deadlocks</button>
+</div>
+<p class="why">Each thread writes only its own element, but reads its neighbours'. The barrier makes sure every read finishes before any write starts.</p>
+</div>
+
+<div class="quiz">
+<p class="q">When does a <code>CyclicBarrier</code>'s barrier action run?</p>
+<div class="options">
+<button class="opt" data-correct>once, after the last party arrives and before any is released</button>
+<button class="opt">once in every thread, as it arrives</button>
+<button class="opt">before the first party arrives</button>
+<button class="opt">after all threads have finished</button>
+</div>
+<p class="why">That's why it's useful for checking or updating shared state between phases (slide 15): nobody is running at that moment.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0017/Smoother.java"><code>lessons/code/0017/Smoother.java</code></a>. <code>smooth()</code> starts one thread per element but has no barrier and no latch. Add both where the <code>TODO</code>s are, then run:</p>
+<pre class="language-bash">cd lessons/code/0017
+java Smoother.java</pre>
+<p>It smooths 100 random arrays of 40 elements and compares each result with a plain single-threaded calculation. Unchanged, all 100 are wrong. The edges are divided by 2, as corrected above.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>Both are created with <code>n</code>: the barrier needs all <code>n</code> threads to arrive, and the latch counts <code>n</code> finishes. Put <code>barrier.await()</code> between the reads and the write (it needs a <code>try</code> with two <code>catch</code>es), <code>done.countDown()</code> after the write, and <code>done.await()</code> at the end of <code>smooth()</code>.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) Remove only the barrier. (b) Put it back and remove only <code>done.await()</code>. Each mistake alone, how many trials are wrong? (c) Could <code>join()</code> replace the latch here?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>CyclicBarrier barrier = new CyclicBarrier(n);
+CountDownLatch done = new CountDownLatch(n);
+// in each thread, after the reads:
+try { barrier.await(); }
+catch (InterruptedException
+       | BrokenBarrierException e) {}
+data[k] = sum / count;
+done.countDown();
+// after the loop:
+try { done.await(); } catch (InterruptedException e) {}</pre>
+<p>(a) and (b): 100 of 100 wrong each time on my machine. Each one alone is enough to break it. (c) Yes, if you keep the 40 <code>Thread</code> objects in an array and join them all. The latch just saves you keeping them, which matters when the work runs in a pool (lesson 18).</p>
+<p><code>catch (A | B e)</code> is Java's multi-catch: one block for either exception.</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Compare <code>CountDownLatch</code> and <code>CyclicBarrier</code>, with a use for each. (4 marks)</summary>
+<p>A <code>CountDownLatch</code> is initialised with a count. Threads calling <code>await()</code> block until <code>countDown()</code> has been called that many times, and then the latch stays open forever: it is one-use. Use: <code>main</code> waits for n worker threads to finish, or n threads wait for one start signal. A <code>CyclicBarrier</code> is initialised with a number of parties. Each party's <code>await()</code> blocks until all have arrived, then all are released and the barrier resets for reuse. It can also run an optional barrier action. Use: threads that must all finish one phase, such as initialising an array, before any starts the next.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> the class descriptions at the top of the <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CountDownLatch.html"><code>CountDownLatch</code></a> and <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/CyclicBarrier.html"><code>CyclicBarrier</code></a> Javadoc. About 10 minutes. The latch's first example is slides 6–8's start and end latches almost exactly.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Write a start gate and a finish line for n threads.</summary><pre>CountDownLatch start = new CountDownLatch(1);
+CountDownLatch end = new CountDownLatch(n);
+// worker: start.await(); work; end.countDown();
+// main:   start.countDown(); end.await();</pre></details>
+<details class="recall"><summary>Why is a barrier "cyclic"?</summary><p>After all parties arrive and are released, it resets, so the same barrier can be used again for the next phase.</p></details>
+<details class="recall"><summary>What's a binary semaphore, and what is it equivalent to? (lesson 15)</summary><p>A semaphore that starts at 1. Acquire and release around a critical section make it work as a lock.</p></details>
+
+<div class="next"><a href="0016-semaphore-puzzles.html">← Lesson 16: semaphore puzzles</a><a href="0018-queues-and-pools.html">Lesson 18: queues and pools →</a></div>
+
+<footer class="ask">Want the barrier-action example from slide 16 written out, since slide 17 is blank? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

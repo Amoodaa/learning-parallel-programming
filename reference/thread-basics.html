@@ -137,13 +137,71 @@ if (lock.tryLock()) {                // don't wait
 }</pre>
 <p>Need two locks? Always take them in the same order, e.g. lower index first.</p>
 
+<h2>Condition (D4 s5–16)</h2>
+<pre>Condition notFull = lock.newCondition();
+
+lock.lock();
+try {
+    while (count == max) {          // while, never if
+        try { notFull.await(); }    // releases the lock
+        catch (InterruptedException e) {}
+    }
+    count++;
+    notEmpty.signal();              // or signalAll()
+} finally { lock.unlock(); }</pre>
+<p>Signal on every change, not only when the state crosses a boundary (see errata). Wake all (<code>signalAll</code>) when several waiters may all proceed.</p>
+
+<h2>interrupt (D4 s40–42)</h2>
+<pre>t.interrupt();                  // ask t to stop
+// running thread polls:
+if (Thread.currentThread().isInterrupted()) return;
+// blocked thread gets an exception:
+try { Thread.sleep(1000); }
+catch (InterruptedException e) { return; }</pre>
+
+<h2>Semaphore (D5 s2–23)</h2>
+<pre>import java.util.concurrent.*;
+
+Semaphore s = new Semaphore(n);  // 1 lock, 0 signal, n limit
+try { s.acquire(); }             // take a permit or wait
+catch (InterruptedException e) {}
+s.release();                     // any thread may release</pre>
+
+<h2>Latch and barrier (D6 s2–22)</h2>
+<pre>CountDownLatch done = new CountDownLatch(n);
+done.countDown();        // in each worker, when finished
+done.await();            // in main (+ try)
+
+CyclicBarrier b = new CyclicBarrier(n);  // (n, action)
+try { b.await(); }       // wait for all n threads
+catch (InterruptedException
+       | BrokenBarrierException e) {}</pre>
+
+<h2>Blocking queue (D6 s23–32)</h2>
+<pre>ArrayBlockingQueue&lt;Job&gt; q = new ArrayBlockingQueue&lt;&gt;(8);
+q.put(job);              // waits while full
+Job j = q.take();        // waits while empty
+// stop k consumers: put k sentinel jobs at the end</pre>
+
+<h2>Atomic and CAS (D7 s13–35)</h2>
+<pre>import java.util.concurrent.atomic.*;
+
+AtomicInteger n = new AtomicInteger(0);
+n.incrementAndGet();             // atomic ++n
+
+int v;                           // the CAS retry loop
+do { v = n.get(); }
+while (!n.compareAndSet(v, v + k));
+
+AtomicReference&lt;Node&gt; head = new AtomicReference&lt;&gt;();</pre>
+
 <h2>Shared vs private</h2>
 <div class="table-wrap"><table>
 <tr><th>Shared between threads</th><th>Private to each thread</th></tr>
 <tr><td>Objects and their fields; arrays; <code>static</code> variables</td><td>Local variables and parameters (each thread has its own stack)</td></tr>
 </table></div>
 
-<p class="slides">Sources: Deck 1 slides 41–79, Deck 2 slides 22–98, Deck 3 slides 5–91; <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html">java.lang.Thread Javadoc</a>; <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/">Oracle Concurrency tutorial</a>.</p>
+<p class="slides">Sources: Deck 1 slides 41–79, Deck 2 slides 22–98, Deck 3 slides 5–91, Decks 4–7; <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Thread.html">java.lang.Thread Javadoc</a>; <a href="https://docs.oracle.com/javase/tutorial/essential/concurrency/">Oracle Concurrency tutorial</a>.</p>
 </main>
 </body>
 </html>

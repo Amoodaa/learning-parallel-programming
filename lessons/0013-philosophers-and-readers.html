@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Philosophers and Readers/Writers</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 13 of 19 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Philosophers and Readers/Writers</h1>
+<p class="subtitle">Two classic exam problems, both solved with lesson 12's lock and conditions. Philosophers can deadlock; readers can share; writers need the data to themselves.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll write a readers/writers control that lets many readers in at once but never lets a writer overlap anyone. About 25 minutes.</p>
+
+<p>Deck 4 slides 17–39 apply lesson 12's pattern to the two problems slide 4 promised. The dining philosophers bring back deadlock (lessons 3 and 11) with a new fix: limit how many threads can <em>try</em>. Readers/writers shows that "one thread at a time" is sometimes too strict.</p>
+
+<h2>1 · The dining philosophers</h2>
+<p class="slides">Deck 4 · slides 17–22</p>
+
+<p>Five philosophers sit at a round table with one chopstick between each pair of neighbours (slide 17). A philosopher alternates between <strong>thinking</strong> and <strong>eating</strong> (slide 18), and to eat needs both the left and the right chopstick. Each philosopher is a thread (slide 22):</p>
+<pre>while (true) {
+    think(phil);     // sleep 5 s  (slide 20)
+    // pick up chopsticks
+    eat(phil);       // sleep 3 s  (slide 21)
+    // put down chopsticks
+}</pre>
+<p>With 5 chopsticks and 2 needed each, at most 2 can eat at once (slide 19).</p>
+
+<h2>2 · Chopsticks, and the deadlock</h2>
+<p class="slides">Deck 4 · slides 23–27</p>
+
+<p>A chopstick is a one-user resource, written like lesson 12's garden with a maximum of 1 (slides 23–25). <code>pickUp()</code> waits on <code>notInUse</code> while <code>inuse</code> is true, then sets it. <code>putDown()</code> clears it and signals. Slide 26 gives each philosopher its left and right chopstick:</p>
+<pre>ch1.pickUp(); ch2.pickUp();   // left, then right
+eat(phil);
+ch1.putDown(); ch2.putDown();</pre>
+<p>Slide 27: if all five pick up their left chopstick at the same moment, each then waits forever for the right one, which a neighbour is holding. All four Coffman conditions (lesson 3) hold:</p>
+<ul>
+<li><strong>Mutual exclusion:</strong> a chopstick has one user at a time.</li>
+<li><strong>Hold and wait:</strong> each philosopher holds the left chopstick while waiting for the right.</li>
+<li><strong>No pre-emption:</strong> nobody takes a chopstick out of another's hand.</li>
+<li><strong>Circular wait:</strong> 0 waits for 1, 1 for 2, and so on, and 4 waits for 0.</li>
+</ul>
+
+<h2>3 · The fix: at most n−1 at the table</h2>
+<p class="slides">Deck 4 · slides 27–31</p>
+
+<p>Slide 27's fix: let at most <code>n − 1</code> philosophers try to eat at once. <code>DeadLockPrevention</code> (slides 28–30) is lesson 12's garden again, with <code>max = n − 1</code>. <code>enters()</code> waits while <code>eating == max</code>, and <code>leaves()</code> decrements and signals. Slide 31 wraps the chopstick code in it:</p>
+<pre>deadLock.enters();            // at most 4 of 5 get past
+ch1.pickUp(); ch2.pickUp();
+eat(phil);
+ch1.putDown(); ch2.putDown();
+deadLock.leaves();</pre>
+<p>Why does it work? With 4 philosophers and 5 chopsticks, even if each of the 4 holds one chopstick, one chopstick is still free. That chopstick lies next to someone who is already holding their other one, so that philosopher can eat, finish and put both down. The circle can never close, so this breaks <strong>circular wait</strong>.</p>
+<span class="sidenote">Two notes on slides 27–31. Slide 27 says the limit also stops a philosopher "eating forever". It doesn't: the limit counts philosophers, not time. What stops it is that <code>eat()</code> sleeps for a fixed 3 s. Also, <code>volatile</code> on slide 28's fields does no harm but isn't needed, because they're only used under the lock (compare Deck 3 s94–97 in lesson 11).</span>
+<p>Slide 19 mentions another fix in words only: pick up <strong>both chopsticks at once</strong> (wait until both are free, then take both). That breaks hold and wait. Lesson 11's <strong>resource ordering</strong> also works: if every philosopher picks up the lower-numbered chopstick first, the cycle can't form.</p>
+
+<h2>4 · Readers/writers</h2>
+<p class="slides">Deck 4 · slides 32–39</p>
+
+<p>Slide 32's rules for a shared data set:</p>
+<ul>
+<li>only one writer at a time;</li>
+<li>readers are blocked while a writer writes, and writers are blocked while anyone reads;</li>
+<li><strong>many readers at once</strong> are fine, because reading changes nothing;</li>
+<li>writers take precedence over readers.</li>
+</ul>
+<p>A plain lock would also be correct, but it would force readers to take turns for no reason. The control in slides 33–37 keeps three variables under one lock: <code>readers</code> (reading now), <code>writing</code>, and <code>waitingWriters</code>. It has two conditions: writers wait on <code>wCond</code> and readers on <code>rCond</code>.</p>
+
+<div class="table-wrap"><table>
+<tr><th>Method</th><th>Waits while</th><th>Then</th></tr>
+<tr><td><code>startWrite</code> (s34)</td><td><code>writing || readers &gt; 0</code>, counting itself in <code>waitingWriters</code></td><td><code>writing = true</code></td></tr>
+<tr><td><code>stopWrite</code> (s35)</td><td>never waits</td><td><code>writing = false</code>; if a writer waits, <code>wCond.signal()</code>, else <code>rCond.signalAll()</code></td></tr>
+<tr><td><code>startRead</code> (s36)</td><td><code>writing || waitingWriters &gt; 0</code></td><td><code>readers++</code></td></tr>
+<tr><td><code>stopRead</code> (s37)</td><td>never waits</td><td><code>readers--</code>; the last one out does <code>wCond.signal()</code></td></tr>
+</table></div>
+
+<p>Three details to understand:</p>
+<ul>
+<li><strong>Writer precedence</strong> comes from <code>startRead</code> also waiting while <code>waitingWriters &gt; 0</code>. A new reader can't slip in while a writer is queued. The price: if writers keep arriving, readers can starve.</li>
+<li><strong><code>signalAll</code> for readers.</strong> After a write, every waiting reader may go in together, so wake them all. With <code>signal()</code>, only one reader would wake, and nothing would ever wake the rest.</li>
+<li><strong><code>signal</code> for writers.</strong> Only one writer can go in, so waking one is enough.</li>
+</ul>
+<p>Slides 38–39 wrap it around an array. <code>read(k)</code> calls <code>startRead()</code> and returns, and the caller must later call <code>stopRead()</code> itself. That's fragile: forget it once and writers wait forever. It's safer to keep start, access and stop together in one method, with the stop in a <code>finally</code> as in lesson 11. (Slide 33 also leaves out a type: <code>private lock</code> should be <code>private Lock lock</code>.)</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">All five philosophers hold their left chopstick and wait for the right. Which Coffman condition does "at most n−1 may try" break?</p>
+<div class="options">
+<button class="opt" data-correct>circular wait</button>
+<button class="opt">mutual exclusion</button>
+<button class="opt">hold and wait</button>
+<button class="opt">no pre-emption</button>
+</div>
+<p class="why">With only 4 trying, one chopstick is always spare, so someone can complete a pair and the cycle never closes. Philosophers still hold one chopstick while waiting, so hold and wait is still there.</p>
+</div>
+
+<div class="quiz">
+<p class="q">In readers/writers, what gives writers precedence over readers?</p>
+<div class="options">
+<button class="opt" data-correct>startRead also waits while waitingWriters &gt; 0</button>
+<button class="opt">writers use signalAll</button>
+<button class="opt">the lock is created fair</button>
+<button class="opt">writers have a higher thread priority</button>
+</div>
+<p class="why">A queued writer blocks new readers, so the current readers drain away and the writer gets in. <code>stopWrite</code> also prefers waking a writer over the readers.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Why does <code>stopWrite</code> wake readers with <code>signalAll()</code>, but writers with <code>signal()</code>?</p>
+<div class="options">
+<button class="opt" data-correct>many readers may proceed together; only one writer can</button>
+<button class="opt">readers are more important than writers</button>
+<button class="opt">signal() is not allowed on rCond</button>
+<button class="opt">signalAll() is faster with many threads</button>
+</div>
+<p class="why">Waking one reader would leave the others asleep even though they're allowed in, and nothing else would wake them. Waking all writers would be wasted, because all but one would just wait again.</p>
+</div>
+
+<div class="quiz">
+<p class="q">Why not protect the shared data with a single <code>ReentrantLock</code> for both reads and writes?</p>
+<div class="options">
+<button class="opt" data-correct>it's safe, but readers would needlessly take turns</button>
+<button class="opt">it would deadlock</button>
+<button class="opt">writes would not be visible to readers</button>
+<button class="opt">readers would starve writers</button>
+</div>
+<p class="why">One lock is correct (lesson 8) but too strict. Reads don't change anything, so letting them overlap is safe and allows more concurrency. That's the same trade-off as coarse vs fine-grained locking in lesson 10.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0013/ReadWrite.java"><code>lessons/code/0013/ReadWrite.java</code></a>. The fields and both conditions are declared. Write the four methods, then run:</p>
+<pre class="language-bash">cd lessons/code/0013
+java ReadWrite.java</pre>
+<p>6 readers and 2 writers use a shared pair of numbers that every writer keeps equal. <code>PASS</code> needs no overlap (a writer with anyone), at least 2 readers inside at the same time at some point, and no thread left waiting.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>Every method is <code>lock.lock(); try { … } finally { lock.unlock(); }</code>. Use the table in section 4: the "waits while" column becomes a <code>while</code> loop around <code>await()</code> on the method's own condition. In <code>startWrite</code>, put <code>waitingWriters++</code> just before the <code>await()</code> and <code>waitingWriters--</code> just after it.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) In <code>stopWrite</code>, change <code>rCond.signalAll()</code> to <code>rCond.signal()</code>. What happens, and why? (b) Delete <code>|| waitingWriters &gt; 0</code> from <code>startRead</code>. Does it still pass? Which rule from slide 32 did you drop?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>void startRead() {
+    lock.lock();
+    try {
+        while (writing || waitingWriters &gt; 0) {
+            try { rCond.await(); }
+            catch (InterruptedException e) {}
+        }
+        readers++;
+    } finally { lock.unlock(); }
+}
+void stopRead() {
+    lock.lock();
+    try {
+        readers--;
+        if (readers == 0) wCond.signal();
+    } finally { lock.unlock(); }
+}
+void startWrite() {
+    lock.lock();
+    try {
+        while (writing || readers &gt; 0) {
+            waitingWriters++;
+            try { wCond.await(); }
+            catch (InterruptedException e) {}
+            waitingWriters--;
+        }
+        writing = true;
+    } finally { lock.unlock(); }
+}
+void stopWrite() {
+    lock.lock();
+    try {
+        writing = false;
+        if (waitingWriters &gt; 0) wCond.signal();
+        else rCond.signalAll();
+    } finally { lock.unlock(); }
+}</pre>
+<p>(a) It hangs (3 runs out of 3 on my machine): one reader wakes, and the others wait on <code>rCond</code> with nobody left to signal it. (b) It still passes, because no rule the checker tests is broken. You dropped "writers take precedence", so a steady stream of readers could now keep a writer out forever.</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Describe the dining philosophers problem. Explain how deadlock can occur, and one way of preventing it. (6 marks)</summary>
+<p>Five philosophers sit at a round table, alternately thinking and eating, with one chopstick between each pair. To eat, a philosopher needs both adjacent chopsticks. Each chopstick can be used by one philosopher at a time. If every philosopher picks up their left chopstick at the same time, each waits forever for the right one, which their neighbour holds. All four conditions hold: mutual exclusion, hold and wait, no pre-emption, and a circular wait around the table. Prevention: allow at most n−1 philosophers to try to eat at once, using a counter guarded by a lock and condition. With n−1 philosophers and n chopsticks, at least one philosopher can always get both chopsticks, so the circular wait can't form. (Other answers: pick up both chopsticks at once, which breaks hold and wait; or pick up the lower-numbered one first, which breaks circular wait.)</p></details>
+<details class="recall"><summary>State the readers/writers rules and explain why multiple readers are allowed. (4 marks)</summary>
+<p>One writer at a time; no readers while a writer writes; no writer while anyone reads; any number of readers together; and, in the slides' version, writers before readers. Readers are allowed together because reading doesn't change the data, so overlapping reads can't interfere. Only a write conflicts with another access.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-sema.pdf">OSTEP ch. 31</a>, sections 31.5 (reader-writer locks) and 31.6 (the dining philosophers). It uses semaphores, which are lesson 15's topic, but the reasoning about deadlock and starvation is the same. About 10 minutes.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>Why can the n−1 limit never deadlock five philosophers?</summary><p>With 4 trying and 5 chopsticks, one chopstick is always free, so at least one philosopher can complete a pair, eat and release. The circular wait can't close.</p></details>
+<details class="recall"><summary>Readers/writers: who does <code>stopWrite</code> wake, and how?</summary><p>One waiting writer with <code>signal()</code> if there is one, otherwise all waiting readers with <code>signalAll()</code>.</p></details>
+<details class="recall"><summary>What are the four Coffman conditions? (lesson 3)</summary><p>Mutual exclusion, hold and wait, no pre-emption, circular wait. All four are needed for deadlock.</p></details>
+
+<div class="next"><a href="0012-condition-variables.html">← Lesson 12: condition variables</a><a href="0014-interrupts-and-signals.html">Lesson 14: interrupts and signals →</a></div>
+
+<footer class="ask">Want a runnable dining philosophers that deadlocks, then the n−1 fix? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>

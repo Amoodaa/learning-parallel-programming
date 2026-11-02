@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semaphores</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../assets/highlight.js" defer></script>
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+<main>
+<nav class="crumbs"><a href="../reference/course-map.html">Course map</a> · Lesson 15 of 19 · <a href="../reference/thread-basics.html">Thread basics</a> · <a href="../reference/glossary.html">Glossary</a></nav>
+
+<h1>Semaphores</h1>
+<p class="subtitle">A counter of permits. Depending on where it starts, the same tool is a lock, a "go" signal, or a limit on how many threads get in.</p>
+
+<p class="goal"><strong>Your win today:</strong> you'll make one thread wait for another, make two threads meet, and cap a tunnel at 3 cars, all with semaphores. About 20 minutes.</p>
+
+<p>Deck 5 (Semaphores) gives a second tool for what Deck 4 did with conditions. Deck 1 slide 32 mentioned Dijkstra's semaphore from 1965, and this is it. Slides 2–23 introduce it through four patterns, and the last one rebuilds lesson 12's producer/consumer. Lesson 16 covers the puzzles in slides 24–45.</p>
+
+<h2>1 · What a semaphore is</h2>
+<p class="slides">Deck 5 · slides 2–5</p>
+
+<p>A semaphore holds a count of <strong>permits</strong> and has two operations (slides 2–3):</p>
+<ul>
+<li><code>acquire()</code>: if the count is above 0, take one and carry on. If it's 0, sleep until one is released. The check, the decrement and going to sleep are one atomic step.</li>
+<li><code>release()</code>: add one permit. If threads are sleeping in <code>acquire()</code>, one of them gets it and carries on.</li>
+</ul>
+<pre>import java.util.concurrent.*;
+
+Semaphore sem = new Semaphore(1);   // starting permits
+try { sem.acquire(); }              // may throw
+catch (InterruptedException e) {}
+// ...
+sem.release();</pre>
+<p>A semaphore that starts at 1 is a <strong>binary semaphore</strong>, which works as a lock: slides 4–5 protect <code>x = x + 1</code> with one. There's one difference from a lock: a permit has no owner. <strong>Any thread may release</strong>, even one that never acquired. The next two patterns rely on that.</p>
+<span class="sidenote">"There is no requirement that a thread that releases a permit must have acquired that permit by calling acquire()." <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/Semaphore.html">Semaphore Javadoc</a></span>
+
+<h2>2 · Signalling: "go first", and meeting up</h2>
+<p class="slides">Deck 5 · slides 6–13</p>
+
+<p><strong>Order</strong> (slides 6–9). TA must run before TB, whichever starts first. Use a semaphore that starts at <strong>0</strong>, so the permit is a message saying "TA is done":</p>
+<pre>Semaphore sem = new Semaphore(0);
+// TA:  work;  sem.release();
+// TB:  sem.acquire();  work;   // blocks until TA's release</pre>
+
+<p><strong>Rendezvous</strong> (slides 10–13). Each thread must reach a point before the other goes past it: TA's <code>st2</code> waits for TB's <code>st3</code>, and TB's <code>st4</code> waits for TA's <code>st1</code>. Use two semaphores, both starting at 0, one for each "I've arrived" message:</p>
+<pre>// TA: st1; aArrived.release(); bArrived.acquire(); st2;
+// TB: st3; bArrived.release(); aArrived.acquire(); st4;</pre>
+<p>Each thread <strong>releases its own message before waiting</strong> for the other's. If both waited first, each would wait for a release that never comes: a deadlock. (Slide 11's comment, copied from slide 7, says "TA executes before TB". That's wrong here: in a rendezvous neither goes first.)</p>
+
+<h2>3 · Counting: the tunnel</h2>
+<p class="slides">Deck 5 · slides 14–19</p>
+
+<p>At most <code>n</code> cars may be in a tunnel at once (slide 14). Start the semaphore at <code>n</code>: each car acquires a permit to enter and releases it when it leaves, so car <code>n + 1</code> waits (slides 15–17). Slide 18 adds a point that's easy to miss: the semaphore allows <em>n threads in at once</em>, so it does <strong>not</strong> protect data. The count of cars inside is updated by several threads at once, so it needs its own protection: an <code>AtomicInteger</code> (lesson 19), or a lock.</p>
+
+<p><strong>Don't <code>acquire()</code> inside <code>synchronized</code></strong> (slide 19). In slide 19, <code>t()</code> is <code>synchronized</code> and blocks in <code>sem.acquire()</code>. The only thread that can release is in <code>t1()</code>, which is also <code>synchronized</code> on the same object. So <code>t()</code> holds the lock while waiting for a permit, and <code>t1()</code> waits for the lock before it can release one. That's a deadlock. Unlike <code>await()</code> (lesson 12), <code>acquire()</code> does not release any lock you hold.</p>
+
+<h2>4 · Producer/consumer with semaphores</h2>
+<p class="slides">Deck 5 · slides 20–23</p>
+
+<p>Lesson 12's bounded buffer again, with two semaphores instead of two conditions. Both count something:</p>
+<div class="table-wrap"><table>
+<tr><th>Slide's name</th><th>What it counts</th><th>Starts at</th><th>acquire()</th><th>release()</th></tr>
+<tr><td><code>full</code></td><td>free slots</td><td><code>max</code></td><td>producer, before adding</td><td>consumer, after removing</td></tr>
+<tr><td><code>empty</code></td><td>items in the buffer</td><td>0</td><td>consumer, before removing</td><td>producer, after adding</td></tr>
+</table></div>
+<p>The names are confusing: <code>empty</code> counts items, and the consumer waits on it when the buffer <em>is</em> empty. Read them as "the semaphore that controls the consumer" and "the one that controls the producer", which is how slide 20 describes them.</p>
+<pre>public void put(E x) {           // slide 22
+    full.acquire();        // wait for a free slot (+ try)
+    lock.lock();
+    try {
+        buffer.add(x);
+        empty.release();         // one more item
+    } finally { lock.unlock(); }
+}</pre>
+<p>Two details. The semaphores only count, so a <strong>lock is still needed</strong>: two producers may both hold a permit and call <code>add</code> on the same <code>ArrayList</code> at once. And <code>acquire()</code> comes <strong>before</strong> <code>lock()</code>. The other way round, a producer would wait for a slot while holding the lock that consumers need to free one, which is slide 19's deadlock again.</p>
+
+<h2>Check yourself</h2>
+<p>Answer from memory, without scrolling up. You get one click per question.</p>
+
+<div class="quiz">
+<p class="q">To make TB wait until TA has finished, what should the semaphore start at?</p>
+<div class="options">
+<button class="opt" data-correct>0</button>
+<button class="opt">1</button>
+<button class="opt">2</button>
+<button class="opt">the number of threads</button>
+</div>
+<p class="why">With 0 permits, TB's <code>acquire()</code> blocks until TA's <code>release()</code> creates one. Starting at 1 would let TB straight through.</p>
+</div>
+
+<div class="quiz">
+<p class="q">In the rendezvous, why must each thread <code>release()</code> its own semaphore <em>before</em> it <code>acquire()</code>s the other?</p>
+<div class="options">
+<button class="opt" data-correct>if both acquire first, both wait forever</button>
+<button class="opt">release() is faster than acquire()</button>
+<button class="opt">otherwise the permits exceed 1</button>
+<button class="opt">acquire() can only be called once</button>
+</div>
+<p class="why">Each would be waiting for a message the other hasn't sent yet, and neither can send it while waiting. That's a deadlock.</p>
+</div>
+
+<div class="quiz">
+<p class="q">The tunnel semaphore starts at <code>n</code>. Why does the car count still need an <code>AtomicInteger</code>?</p>
+<div class="options">
+<button class="opt" data-correct>up to n cars update it at the same time</button>
+<button class="opt">semaphores can't count above 1</button>
+<button class="opt">acquire() resets the counter</button>
+<button class="opt">it doesn't; the semaphore protects it</button>
+</div>
+<p class="why">A semaphore with n permits lets n threads in together, so it gives no mutual exclusion among them. <code>num++</code> from several cars at once would lose updates (lesson 8).</p>
+</div>
+
+<div class="quiz">
+<p class="q">Slide 19: <code>synchronized t()</code> calls <code>sem.acquire()</code>, and <code>synchronized t1()</code> calls <code>sem.release()</code>. Why can this deadlock?</p>
+<div class="options">
+<button class="opt" data-correct>t() keeps the object's lock while it waits, so t1() can't enter</button>
+<button class="opt">a semaphore can't be used in a class with synchronized methods</button>
+<button class="opt">release() needs the lock that acquire() took</button>
+<button class="opt">the semaphore starts at 0, which is illegal</button>
+</div>
+<p class="why"><code>acquire()</code> doesn't release locks you already hold. The thread that would release the permit is blocked waiting for that lock.</p>
+</div>
+
+<p class="score"></p>
+
+<h2>Now do it</h2>
+<p>Open <a href="code/0015/ThreeSemaphores.java"><code>lessons/code/0015/ThreeSemaphores.java</code></a>. It has three small parts (order, rendezvous, tunnel). Each needs the right starting value and a couple of <code>acquire</code>/<code>release</code> calls where the <code>TODO</code>s are. Then run:</p>
+<pre class="language-bash">cd lessons/code/0015
+java ThreeSemaphores.java</pre>
+<p>Each part runs 200 times with the threads started in random order and random delays. Each must be correct 200/200 for <code>PASS</code>. If a part gets stuck, the checker says so instead of hanging.</p>
+
+<details class="recall"><summary>Stuck? Hint</summary>
+<p>Ask "how many threads may pass before anyone releases?" Order: none, so 0. Rendezvous: none, so 0 and 0. Tunnel: 3. The helper <code>acquire(s)</code> hides the <code>try</code>/<code>catch</code> for you.</p>
+</details>
+<details class="recall"><summary>Stretch: break it on purpose</summary>
+<p>(a) In part 2, swap the order in both threads so each acquires before it releases. What does the checker report? (b) In part 1, start the semaphore at 1. Does B still always go second?</p>
+</details>
+<details class="recall"><summary>Solution (only after trying)</summary>
+<pre>// Part 1
+aDone = new Semaphore(0);
+taskA: log("A"); aDone.release();
+taskB: acquire(aDone); log("B");
+
+// Part 2
+aArrived = new Semaphore(0); bArrived = new Semaphore(0);
+taskTA: log("st1"); aArrived.release();
+        acquire(bArrived); log("st2");
+taskTB: log("st3"); bArrived.release();
+        acquire(aArrived); log("st4");
+
+// Part 3
+control = new Semaphore(3);
+car: acquire(control); inTunnel(); control.release();</pre>
+<p>(a) Part 2 gets stuck on its very first run, and the checker stops that part. Each thread is waiting for the other's release. (b) No. B can take the spare permit and go first: on my machine part 1 was right in only 95 of 200 runs.</p>
+</details>
+
+<h2>Exam practice</h2>
+<details class="recall"><summary>Define a semaphore and its two operations. Show how a semaphore can make thread TA execute before thread TB. (5 marks)</summary>
+<p>A semaphore is a non-negative counter with two atomic operations. <code>acquire()</code> decrements it if it's above 0, and otherwise blocks until it can. <code>release()</code> increments it, letting one blocked thread complete its <code>acquire()</code>. To order TA before TB: create <code>new Semaphore(0)</code> and share it. TA does its work and then calls <code>release()</code>. TB calls <code>acquire()</code> first, which blocks until TA's release, and then does its work. Whichever thread is scheduled first, TB's work cannot start before TA's release.</p></details>
+<details class="recall"><summary>Explain how two semaphores and a lock implement a bounded buffer. (5 marks)</summary>
+<p>One semaphore counts free slots and starts at <code>max</code>. The other counts items and starts at 0. The producer acquires a free slot, adds the item under the lock, then releases an item permit. The consumer acquires an item permit, removes the item under the lock, then releases a free slot. The producer therefore blocks when the buffer is full and the consumer when it's empty. The lock is still needed because several threads holding permits may change the list at once. The semaphore is acquired before taking the lock, so no thread blocks while holding it.</p></details>
+<p>Marks are my estimate, not taken from your exam.</p>
+
+<h2>Read next</h2>
+<p><strong>Primary source:</strong> <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/threads-sema.pdf">OSTEP ch. 31</a>, sections 31.1–31.4 (the definition, binary semaphores, ordering, producer/consumer). About 15 minutes. It's written in C, but the ideas are the same, and section 31.4 explains why the lock must go <em>inside</em> the semaphore calls.</p>
+
+<h2>Next time, from memory</h2>
+<details class="recall"><summary>What starting value gives (a) a lock, (b) "wait for my signal", (c) "at most n at once"?</summary><p>(a) 1. (b) 0. (c) n.</p></details>
+<details class="recall"><summary>Name one way a semaphore differs from a <code>ReentrantLock</code>.</summary><p>Any thread may release a permit; nobody owns it. A lock must be unlocked by the thread that locked it. (A semaphore also isn't reentrant, and can allow n threads at once.)</p></details>
+<details class="recall"><summary>Why does <code>await()</code> release the lock, and why does that matter? (lesson 12)</summary><p>So that another thread can take the lock and change the condition. Otherwise the waiter would block everyone, as <code>acquire()</code> inside <code>synchronized</code> does on slide 19.</p></details>
+
+<div class="next"><a href="0014-interrupts-and-signals.html">← Lesson 14: interrupts and signals</a><a href="0016-semaphore-puzzles.html">Lesson 16: semaphore puzzles →</a></div>
+
+<footer class="ask">Want a runnable tunnel that prints the cars going in and out? Ask your teacher (the agent) in the terminal.</footer>
+</main>
+</body>
+</html>
